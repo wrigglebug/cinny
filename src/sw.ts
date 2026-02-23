@@ -345,9 +345,9 @@ const onPushNotification = async (event: PushEvent) => {
   };
 
   if (event.data) {
+    const session = getAnySession();
     try {
       const pushData = event.data.json();
-      const session = getAnySession();
       const sender = pushData.sender ?? pushData.data?.sender ?? undefined;
       if (sender && session?.userId && sender === session.userId) {
         return;
@@ -366,6 +366,8 @@ const onPushNotification = async (event: PushEvent) => {
       title = resolveNotificationTitle(pushData, title);
       if (session?.showPushNotificationContent) {
         options.body = resolveNotificationBody(pushData) ?? options.body;
+      } else {
+        options.body = 'You have a new message!';
       }
       options.icon = pushData.icon || options.icon;
       options.badge = pushData.badge || options.badge;
@@ -399,7 +401,11 @@ const onPushNotification = async (event: PushEvent) => {
       }
     } catch {
       const pushText = event.data.text();
-      options.body = pushText || options.body;
+      if (session?.showPushNotificationContent) {
+        options.body = pushText || options.body;
+      } else {
+        options.body = 'You have a new message!';
+      }
     }
   }
 
