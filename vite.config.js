@@ -14,6 +14,10 @@ import buildConfig from './build.config';
 const copyFiles = {
   targets: [
     {
+      src: 'node_modules/@element-hq/element-call-embedded/dist/*',
+      dest: 'public/element-call',
+    },
+    {
       src: 'node_modules/pdfjs-dist/build/pdf.worker.min.mjs',
       dest: '',
       rename: 'pdf.worker.min.js',
@@ -71,6 +75,23 @@ export default defineConfig({
   appType: 'spa',
   publicDir: false,
   base: buildConfig.base,
+  // Sourcemaps are memory-heavy in CI/Docker builds. Enable via VITE_SOURCEMAP=true when needed.
+  build: {
+    outDir: 'dist',
+    sourcemap: process.env.VITE_SOURCEMAP === 'true',
+    copyPublicDir: false,
+    rollupOptions: {
+      plugins: [inject({ Buffer: ['buffer', 'Buffer'] })],
+    },
+  },
+  resolve: {
+    alias: [
+      {
+        find: /^linkifyjs$/,
+        replacement: path.resolve(__dirname, 'src/shims/linkifyjs.ts'),
+      },
+    ],
+  },
   server: {
     port: 8080,
     host: true,
@@ -118,14 +139,6 @@ export default defineConfig({
           buffer: true,
         }),
       ],
-    },
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: true,
-    copyPublicDir: false,
-    rollupOptions: {
-      plugins: [inject({ Buffer: ['buffer', 'Buffer'] })],
     },
   },
 });
