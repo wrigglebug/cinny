@@ -18,7 +18,7 @@ jobs:
       - name: Checkout your forked repository
         uses: actions/checkout@v4
         with:
-          repository: <your github username>/<your forked repo>
+          repository: just-insane/cinny
           token: ${{ secrets.CLA_PAT }}
           fetch-depth: 0
 
