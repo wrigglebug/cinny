@@ -259,18 +259,25 @@ function buildAppUrl(path: string, session?: SessionInfo): string {
   return new URL(path.replace(/^\//, ''), self.registration.scope).href;
 }
 
+function isDirectFlag(pushData: any): boolean | undefined {
+  if (typeof pushData?.is_direct === 'boolean') return pushData.is_direct;
+  if (typeof pushData?.data?.is_direct === 'boolean') return pushData.data.is_direct;
+  return undefined;
+}
+
 async function resolveNotificationUrl(
   pushData: any,
   session?: SessionInfo
 ): Promise<string> {
-  const url = pushData?.data?.url ?? pushData?.url;
-  if (typeof url === 'string' && url.trim()) return url;
-
   const roomId = pushData?.room_id ?? pushData?.data?.room_id;
   const eventId = pushData?.event_id ?? pushData?.data?.event_id;
   if (typeof roomId === 'string' && roomId.trim()) {
     if (session?.openDirectOnPush) {
-      const isDirect = await withTimeout(isDirectRoom(session, roomId), PUSH_EVENT_LOOKUP_TIMEOUT_MS);
+      const directFlag = isDirectFlag(pushData);
+      const isDirect =
+        typeof directFlag === 'boolean'
+          ? directFlag
+          : await withTimeout(isDirectRoom(session, roomId), PUSH_EVENT_LOOKUP_TIMEOUT_MS);
       if (isDirect) {
         const encodedRoomId = encodeURIComponent(roomId);
         const encodedEventId =
@@ -287,6 +294,9 @@ async function resolveNotificationUrl(
         : '';
     return buildAppUrl(`${HOME_PATH}${encodedRoomId}${encodedEventId}`, session);
   }
+
+  const url = pushData?.data?.url ?? pushData?.url;
+  if (typeof url === 'string' && url.trim()) return url;
 
   return buildAppUrl(INBOX_NOTIFICATIONS_PATH, session);
 }

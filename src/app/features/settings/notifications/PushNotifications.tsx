@@ -49,7 +49,7 @@ export async function enablePushNotifications(
       lang: navigator.language || 'en',
       data: {
         url: pushDetails.pushNotifyUrl,
-        format: 'event_id_only' as const,
+        format: 'full' as const,
         endpoint: pushSubAtom.endpoint,
         p256dh: pushSubAtom.keys!.p256dh!,
         auth: pushSubAtom.keys!.auth!,
@@ -89,7 +89,7 @@ export async function enablePushNotifications(
     lang: navigator.language || 'en',
     data: {
       url: pushDetails.pushNotifyUrl,
-      format: 'event_id_only' as const,
+      format: 'full' as const,
       endpoint: newSubscription.endpoint,
       p256dh: subJson.keys!.p256dh!,
       auth: subJson.keys!.auth!,
