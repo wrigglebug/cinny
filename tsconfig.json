@@ -1,11 +1,16 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "linkifyjs": ["src/shims/linkifyjs.ts"]
+    },
     "sourceMap": true,
     "jsx": "react",
     "target": "ES2016",
     "module": "ES2020",
     "allowJs": true,
     "allowImportingTsExtensions": true,
+    "noEmit": true,
     "strict": true,
     "esModuleInterop": true,
     "moduleResolution": "Bundler",

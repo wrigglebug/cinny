@@ -75,6 +75,14 @@ export default defineConfig({
   appType: 'spa',
   publicDir: false,
   base: buildConfig.base,
+  resolve: {
+    alias: [
+      {
+        find: /^linkifyjs$/,
+        replacement: path.resolve(__dirname, 'src/shims/linkifyjs.ts'),
+      },
+    ],
+  },
   server: {
     port: 8080,
     host: true,
