@@ -272,15 +272,13 @@ function PushNotificationBridge() {
     settingsAtom,
     'showPushNotificationContent'
   );
-  const [openDirectOnPush] = useSetting(settingsAtom, 'openDirectOnPush');
 
   useEffect(() => {
     pushSessionToSW(mx.baseUrl, mx.getAccessToken(), mx.getUserId() ?? undefined, {
       showPushNotificationContent,
-      openDirectOnPush,
       appBaseUrl,
     });
-  }, [mx, showPushNotificationContent, openDirectOnPush, appBaseUrl]);
+  }, [mx, showPushNotificationContent, appBaseUrl]);
 
   return null;
 }

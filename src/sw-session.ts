@@ -1,6 +1,5 @@
 export type PushNotificationSettings = {
   showPushNotificationContent?: boolean;
-  openDirectOnPush?: boolean;
   appBaseUrl?: string;
 };
 

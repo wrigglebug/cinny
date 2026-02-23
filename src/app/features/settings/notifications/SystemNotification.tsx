@@ -176,7 +176,6 @@ export function SystemNotification() {
     settingsAtom,
     'showPushNotificationContent'
   );
-  const [openDirectOnPush, setOpenDirectOnPush] = useSetting(settingsAtom, 'openDirectOnPush');
 
   return (
     <Box direction="Column" gap="100">
@@ -204,11 +203,6 @@ export function SystemNotification() {
               onChange={setShowPushNotificationContent}
             />
           }
-        />
-        <SettingTile
-          title="Open Directs From Push"
-          description="Open direct messages in `/direct/` when a push notification is clicked."
-          after={<Switch value={openDirectOnPush} onChange={setOpenDirectOnPush} />}
         />
       </SequenceCard>
       <SequenceCard

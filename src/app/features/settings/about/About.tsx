@@ -13,6 +13,8 @@ type AboutProps = {
 };
 export function About({ requestClose }: AboutProps) {
   const mx = useMatrixClient();
+  const buildLabel = __BUILD_HASH__ ? ` (${__BUILD_HASH__})` : '';
+  const versionLabel = `v${__APP_VERSION__}${buildLabel}`;
 
   return (
     <Page>
@@ -46,7 +48,7 @@ export function About({ requestClose }: AboutProps) {
                   <Box direction="Column" gap="100">
                     <Box gap="100" alignItems="End">
                       <Text size="H3">Cinny</Text>
-                      <Text size="T200">v4.10.5</Text>
+                      <Text size="T200">{versionLabel}</Text>
                     </Box>
                     <Text>Yet another matrix client.</Text>
                   </Box>

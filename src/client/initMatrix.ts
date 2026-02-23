@@ -11,7 +11,6 @@ export const initClient = async (session: Session): Promise<MatrixClient> => {
   const settings = getSettings();
   pushSessionToSW(session.baseUrl, session.accessToken, session.userId, {
     showPushNotificationContent: settings.showPushNotificationContent,
-    openDirectOnPush: settings.openDirectOnPush,
   });
   const storeName = getSessionStoreName(session);
   const indexedDBStore = new IndexedDBStore({

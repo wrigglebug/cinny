@@ -9,6 +9,8 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
+import { createRequire } from 'module';
 import buildConfig from './build.config';
 
 const copyFiles = {
@@ -70,6 +72,23 @@ function serverMatrixSdkCryptoWasm(wasmFilePath) {
     },
   };
 }
+
+const require = createRequire(import.meta.url);
+const pkg = require('./package.json');
+
+function resolveBuildHash() {
+  const fromEnv = process.env.VITE_BUILD_HASH ?? process.env.GIT_SHA ?? '';
+  if (fromEnv) return fromEnv;
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+  } catch {
+    return '';
+  }
+}
+
+const buildHash = resolveBuildHash();
 
 export default defineConfig({
   appType: 'spa',
@@ -140,5 +159,9 @@ export default defineConfig({
         }),
       ],
     },
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __BUILD_HASH__: JSON.stringify(buildHash),
   },
 });

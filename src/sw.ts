@@ -15,7 +15,6 @@ type SessionInfo = {
   baseUrl: string;
   userId: string;
   showPushNotificationContent: boolean;
-  openDirectOnPush: boolean;
   appBaseUrl?: string;
 };
 
@@ -50,7 +49,6 @@ function setSession(
   userId: any,
   notificationSettings?: {
     showPushNotificationContent?: boolean;
-    openDirectOnPush?: boolean;
     appBaseUrl?: string;
   }
 ) {
@@ -64,7 +62,6 @@ function setSession(
       baseUrl,
       userId,
       showPushNotificationContent: !!notificationSettings?.showPushNotificationContent,
-      openDirectOnPush: !!notificationSettings?.openDirectOnPush,
       appBaseUrl: notificationSettings?.appBaseUrl,
     };
     sessions.set(clientId, session);
@@ -246,9 +243,21 @@ function resolveNotificationBody(pushData: any): string | undefined {
 
 function resolveNotificationTitle(pushData: any, fallback: string): string {
   if (typeof pushData?.title === 'string' && pushData.title.trim()) return pushData.title;
+  const senderName =
+    pushData?.sender_display_name ??
+    pushData?.data?.sender_display_name ??
+    pushData?.sender ??
+    pushData?.data?.sender;
+  if (typeof senderName === 'string' && senderName.trim()) return senderName;
   const roomName = pushData?.data?.room_name ?? pushData?.room_name;
   if (typeof roomName === 'string' && roomName.trim()) return roomName;
   return fallback;
+}
+
+function resolveRoomName(pushData: any): string | undefined {
+  const roomName = pushData?.data?.room_name ?? pushData?.room_name;
+  if (typeof roomName === 'string' && roomName.trim()) return roomName;
+  return undefined;
 }
 
 function buildAppUrl(path: string, session?: SessionInfo): string {
@@ -269,24 +278,29 @@ async function resolveNotificationUrl(
   pushData: any,
   session?: SessionInfo
 ): Promise<string> {
+  const url = pushData?.data?.url ?? pushData?.url;
   const roomId = pushData?.room_id ?? pushData?.data?.room_id;
   const eventId = pushData?.event_id ?? pushData?.data?.event_id;
+  if (!session) {
+    if (typeof url === 'string' && url.trim()) return url;
+  }
   if (typeof roomId === 'string' && roomId.trim()) {
-    if (session?.openDirectOnPush) {
-      const directFlag = isDirectFlag(pushData);
-      const isDirect =
-        typeof directFlag === 'boolean'
-          ? directFlag
-          : await withTimeout(isDirectRoom(session, roomId), PUSH_EVENT_LOOKUP_TIMEOUT_MS);
-      if (isDirect) {
-        const encodedRoomId = encodeURIComponent(roomId);
-        const encodedEventId =
-          typeof eventId === 'string' && eventId.trim()
-            ? `/${encodeURIComponent(eventId)}`
-            : '';
-        return buildAppUrl(`direct/${encodedRoomId}${encodedEventId}`, session);
-      }
+    const directFlag = isDirectFlag(pushData);
+    const isDirect =
+      typeof directFlag === 'boolean'
+        ? directFlag
+        : session
+          ? await withTimeout(isDirectRoom(session, roomId), PUSH_EVENT_LOOKUP_TIMEOUT_MS)
+          : false;
+    if (isDirect) {
+      const encodedRoomId = encodeURIComponent(roomId);
+      const encodedEventId =
+        typeof eventId === 'string' && eventId.trim()
+          ? `/${encodeURIComponent(eventId)}`
+          : '';
+      return buildAppUrl(`direct/${encodedRoomId}${encodedEventId}`, session);
     }
+    if (typeof url === 'string' && url.trim()) return url;
     const encodedRoomId = encodeURIComponent(roomId);
     const encodedEventId =
       typeof eventId === 'string' && eventId.trim()
@@ -295,9 +309,7 @@ async function resolveNotificationUrl(
     return buildAppUrl(`${HOME_PATH}${encodedRoomId}${encodedEventId}`, session);
   }
 
-  const url = pushData?.data?.url ?? pushData?.url;
   if (typeof url === 'string' && url.trim()) return url;
-
   return buildAppUrl(INBOX_NOTIFICATIONS_PATH, session);
 }
 
@@ -365,9 +377,12 @@ const onPushNotification = async (event: PushEvent) => {
       }
       title = resolveNotificationTitle(pushData, title);
       if (session?.showPushNotificationContent) {
-        options.body = resolveNotificationBody(pushData) ?? options.body;
+        const body = resolveNotificationBody(pushData) ?? options.body;
+        const roomName = resolveRoomName(pushData);
+        options.body = roomName ? `${roomName}\n${body}` : body;
       } else {
-        options.body = 'You have a new message!';
+        const roomName = resolveRoomName(pushData);
+        options.body = roomName ? `${roomName}\nYou have a new message!` : 'You have a new message!';
       }
       options.icon = pushData.icon || options.icon;
       options.badge = pushData.badge || options.badge;

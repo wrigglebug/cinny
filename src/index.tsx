@@ -33,7 +33,6 @@ if ('serviceWorker' in navigator) {
     const settings = getSettings();
     pushSessionToSW(session?.baseUrl, session?.accessToken, session?.userId, {
       showPushNotificationContent: settings.showPushNotificationContent,
-      openDirectOnPush: settings.openDirectOnPush,
     });
   };
 
