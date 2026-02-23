@@ -157,17 +157,19 @@ function MessageNotifications() {
       roomName,
       roomAvatar,
       username,
+      body,
     }: {
       roomName: string;
       roomAvatar?: string;
       username: string;
+      body: string;
       roomId: string;
       eventId: string;
     }) => {
-      const noti = new window.Notification(roomName, {
+      const noti = new window.Notification(`${username} — ${roomName}`, {
         icon: roomAvatar,
         badge: roomAvatar,
-        body: `New inbox notification from ${username}`,
+        body,
         silent: true,
       });
 
@@ -227,12 +229,18 @@ function MessageNotifications() {
       if (showNotifications && notificationPermission('granted')) {
         const avatarMxc =
           room.getAvatarFallbackMember()?.getMxcAvatarUrl() ?? room.getMxcAvatarUrl();
+        const content = mEvent.getContent();
+        const messageBody =
+          typeof content?.body === 'string' && content.body.trim()
+            ? content.body
+            : 'You have a new message!';
         notify({
           roomName: room.name ?? 'Unknown',
           roomAvatar: avatarMxc
             ? mxcUrlToHttp(mx, avatarMxc, useAuthentication, 96, 96, 'crop') ?? undefined
             : undefined,
           username: getMemberDisplayName(room, sender) ?? getMxIdLocalPart(sender) ?? sender,
+          body: messageBody,
           roomId: room.roomId,
           eventId,
         });

@@ -211,6 +211,15 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | und
   return Promise.race([promise, timeout]);
 }
 
+async function persistPushDebug(raw: string): Promise<void> {
+  try {
+    const cache = await caches.open('cinny-push-debug');
+    await cache.put('last', new Response(raw, { headers: { 'content-type': 'application/json' } }));
+  } catch {
+    // ignore cache errors
+  }
+}
+
 async function isDirectRoom(session: SessionInfo, roomId: string): Promise<boolean> {
   const cached = directRoomCache.get(roomId);
   const now = Date.now();
@@ -365,8 +374,18 @@ const onPushNotification = async (event: PushEvent) => {
 
   if (event.data) {
     const session = getAnySession();
+    let rawPayload = '';
     try {
-      const pushData = event.data.json();
+      rawPayload = await event.data.text();
+      if (rawPayload) {
+        await persistPushDebug(rawPayload);
+      }
+    } catch {
+      // ignore read errors
+    }
+
+    try {
+      const pushData = rawPayload ? JSON.parse(rawPayload) : await event.data.json();
       const sender = pushData.sender ?? pushData.data?.sender ?? undefined;
       if (sender && session?.userId && sender === session.userId) {
         return;
@@ -419,9 +438,8 @@ const onPushNotification = async (event: PushEvent) => {
         }
       }
     } catch {
-      const pushText = event.data.text();
       if (session?.showPushNotificationContent) {
-        options.body = pushText || options.body;
+        options.body = rawPayload || options.body;
       } else {
         options.body = 'You have a new message!';
       }

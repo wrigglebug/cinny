@@ -164,6 +164,8 @@ function WebPushNotificationSetting() {
 }
 
 export function SystemNotification() {
+  const [lastPushPayload, setLastPushPayload] = useState<string | null>(null);
+  const [pushPayloadError, setPushPayloadError] = useState<string | null>(null);
   const [showInAppNotifs, setShowInAppNotifs] = useSetting(
     settingsAtom,
     'useInAppNotifications'
@@ -204,6 +206,63 @@ export function SystemNotification() {
             />
           }
         />
+      </SequenceCard>
+      <SequenceCard
+        className={SequenceCardStyle}
+        variant="SurfaceVariant"
+        direction="Column"
+        gap="400"
+      >
+        <SettingTile
+          title="Push Debug"
+          description="View the last push payload captured by the service worker."
+          after={
+            <Button
+              variant="Secondary"
+              fill="Soft"
+              size="300"
+              radii="300"
+              onClick={async () => {
+                setPushPayloadError(null);
+                setLastPushPayload(null);
+                try {
+                  if (!('caches' in window)) {
+                    setPushPayloadError('Cache Storage not available in this browser.');
+                    return;
+                  }
+                  const cache = await caches.open('cinny-push-debug');
+                  const response = await cache.match('last');
+                  if (!response) {
+                    setPushPayloadError('No payload captured yet.');
+                    return;
+                  }
+                  const text = await response.text();
+                  setLastPushPayload(text);
+                } catch {
+                  setPushPayloadError('Failed to load push payload.');
+                }
+              }}
+            >
+              <Text size="B300">Load</Text>
+            </Button>
+          }
+        />
+        {pushPayloadError && (
+          <Text size="T200" style={{ color: color.Critical.Main }}>
+            {pushPayloadError}
+          </Text>
+        )}
+        {lastPushPayload && (
+          <Text
+            size="T200"
+            style={{
+              whiteSpace: 'pre-wrap',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            }}
+          >
+            {lastPushPayload}
+          </Text>
+        )}
       </SequenceCard>
       <SequenceCard
         className={SequenceCardStyle}
