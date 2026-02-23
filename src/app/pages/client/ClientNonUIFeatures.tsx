@@ -28,6 +28,7 @@ import { getMxIdLocalPart, mxcUrlToHttp } from '../../utils/matrix';
 import { useSelectedRoom } from '../../hooks/router/useSelectedRoom';
 import { useInboxNotificationsSelected } from '../../hooks/router/useInbox';
 import { useMediaAuthentication } from '../../hooks/useMediaAuthentication';
+import { useRoomNavigate } from '../../hooks/useRoomNavigate';
 
 function SystemEmojiFeature() {
   const [twitterEmoji] = useSetting(settingsAtom, 'twitterEmoji');
@@ -309,6 +310,56 @@ function PushNotificationBridge() {
   return null;
 }
 
+function PushTargetNavigator() {
+  const { navigateRoom } = useRoomNavigate();
+  const navigate = useNavigate();
+
+  const handleTarget = useCallback(
+    (data: { roomId?: string; eventId?: string; action?: string }) => {
+      if (data.action === 'invites') {
+        navigate(getInboxInvitesPath(), { replace: true });
+        return;
+      }
+      if (data.roomId) {
+        navigateRoom(data.roomId, data.eventId, { replace: true });
+      }
+    },
+    [navigate, navigateRoom]
+  );
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const roomId = url.searchParams.get('pushRoomId') ?? undefined;
+    const eventId = url.searchParams.get('pushEventId') ?? undefined;
+    const action = url.searchParams.get('pushAction') ?? undefined;
+    if (!roomId && !action) return;
+
+    url.searchParams.delete('pushRoomId');
+    url.searchParams.delete('pushEventId');
+    url.searchParams.delete('pushAction');
+    window.history.replaceState({}, '', url.toString());
+
+    handleTarget({ roomId, eventId, action });
+  }, [handleTarget]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const handler = (ev: MessageEvent) => {
+      const data = ev.data ?? {};
+      if (data.type !== 'pushNavigate') return;
+      handleTarget({
+        roomId: data.roomId,
+        eventId: data.eventId,
+        action: data.action,
+      });
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, [handleTarget]);
+
+  return null;
+}
+
 type ClientNonUIFeaturesProps = {
   children: ReactNode;
 };
@@ -322,6 +373,7 @@ export function ClientNonUIFeatures({ children }: ClientNonUIFeaturesProps) {
       <InviteNotifications />
       <MessageNotifications />
       <PushNotificationBridge />
+      <PushTargetNavigator />
       {children}
     </>
   );

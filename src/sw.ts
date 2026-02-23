@@ -23,10 +23,6 @@ type SessionInfo = {
  */
 const sessions = new Map<string, SessionInfo>();
 let latestSession: SessionInfo | undefined;
-const directRoomCache = new Map<string, { value: boolean; timestamp: number }>();
-const DIRECT_ROOM_CACHE_TTL_MS = 5 * 60 * 1000;
-const parentRoomCache = new Map<string, { value: string | null; timestamp: number }>();
-const PARENT_ROOM_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const clientToResolve = new Map<string, (value: SessionInfo | undefined) => void>();
 const clientToSessionPromise = new Map<string, Promise<SessionInfo | undefined>>();
@@ -68,7 +64,6 @@ function setSession(
     };
     sessions.set(clientId, session);
     latestSession = session;
-    directRoomCache.clear();
   } else {
     // Logout or invalid session
     sessions.delete(clientId);
@@ -222,53 +217,6 @@ async function persistPushDebug(raw: string): Promise<void> {
   }
 }
 
-async function isDirectRoom(session: SessionInfo, roomId: string): Promise<boolean> {
-  const cached = directRoomCache.get(roomId);
-  const now = Date.now();
-  if (cached && now - cached.timestamp < DIRECT_ROOM_CACHE_TTL_MS) {
-    return cached.value;
-  }
-
-  const url = new URL(
-    `/_matrix/client/v3/user/${encodeURIComponent(session.userId)}/account_data/m.direct`,
-    session.baseUrl
-  );
-  try {
-    const response = await fetch(url, fetchConfig(session.accessToken));
-    if (!response.ok) return false;
-    const data = (await response.json()) as Record<string, string[]>;
-    const isDirect = Object.values(data ?? {}).some((roomIds) => roomIds.includes(roomId));
-    directRoomCache.set(roomId, { value: isDirect, timestamp: now });
-    return isDirect;
-  } catch {
-    return false;
-  }
-}
-
-async function fetchRoomParent(session: SessionInfo, roomId: string): Promise<string | null> {
-  const cached = parentRoomCache.get(roomId);
-  const now = Date.now();
-  if (cached && now - cached.timestamp < PARENT_ROOM_CACHE_TTL_MS) {
-    return cached.value;
-  }
-
-  const url = new URL(
-    `/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/state/m.space.parent`,
-    session.baseUrl
-  );
-  try {
-    const response = await fetch(url, fetchConfig(session.accessToken));
-    if (!response.ok) return null;
-    const data = await response.json();
-    const parentEvent = Array.isArray(data) ? data[0] : data;
-    const parentRoomId = parentEvent?.state_key ?? null;
-    parentRoomCache.set(roomId, { value: parentRoomId, timestamp: now });
-    return parentRoomId;
-  } catch {
-    return null;
-  }
-}
-
 function resolveNotificationBody(pushData: any): string | undefined {
   if (typeof pushData?.body === 'string' && pushData.body.trim()) return pushData.body;
   const contentBody = pushData?.content?.body;
@@ -319,63 +267,38 @@ function buildAppUrl(path: string, session?: SessionInfo): string {
   return new URL(path.replace(/^\//, ''), self.registration.scope).href;
 }
 
-function isDirectFlag(pushData: any): boolean | undefined {
-  if (typeof pushData?.is_direct === 'boolean') return pushData.is_direct;
-  if (typeof pushData?.data?.is_direct === 'boolean') return pushData.data.is_direct;
-  return undefined;
+function buildAppUrlWithQuery(
+  session: SessionInfo | undefined,
+  params: Record<string, string>
+): string {
+  const base = session?.appBaseUrl ?? self.registration.scope;
+  const url = new URL(base);
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+  return url.toString();
 }
 
 async function resolveNotificationUrl(
   pushData: any,
   session?: SessionInfo
 ): Promise<string> {
-  const url = pushData?.data?.url ?? pushData?.url;
   const roomId = pushData?.room_id ?? pushData?.data?.room_id;
   const eventId = pushData?.event_id ?? pushData?.data?.event_id;
-  if (!session) {
-    if (typeof url === 'string' && url.trim()) return url;
+  const url = pushData?.data?.url ?? pushData?.url;
+
+  if (isInviteEvent(pushData)) {
+    return buildAppUrlWithQuery(session, { pushAction: 'invites' });
   }
+
   if (typeof roomId === 'string' && roomId.trim()) {
-    const directFlag = isDirectFlag(pushData);
-    const isDirect =
-      typeof directFlag === 'boolean'
-        ? directFlag
-        : session
-          ? await withTimeout(isDirectRoom(session, roomId), PUSH_EVENT_LOOKUP_TIMEOUT_MS)
-          : false;
-    if (isDirect) {
-      const encodedRoomId = encodeURIComponent(roomId);
-      const encodedEventId =
-        typeof eventId === 'string' && eventId.trim()
-          ? `/${encodeURIComponent(eventId)}`
-          : '';
-      return buildAppUrl(`direct/${encodedRoomId}${encodedEventId}/`, session);
+    const params: Record<string, string> = {
+      pushRoomId: roomId,
+    };
+    if (typeof eventId === 'string' && eventId.trim()) {
+      params.pushEventId = eventId;
     }
-    if (session) {
-      const parentRoomId = await withTimeout(
-        fetchRoomParent(session, roomId),
-        PUSH_EVENT_LOOKUP_TIMEOUT_MS
-      );
-      if (parentRoomId) {
-        const encodedParentId = encodeURIComponent(parentRoomId);
-        const encodedRoomId = encodeURIComponent(roomId);
-        const encodedEventId =
-          typeof eventId === 'string' && eventId.trim()
-            ? `/${encodeURIComponent(eventId)}`
-            : '';
-        return buildAppUrl(
-          `${encodedParentId}/${encodedRoomId}${encodedEventId}/`,
-          session
-        );
-      }
-    }
-    if (typeof url === 'string' && url.trim()) return url;
-    const encodedRoomId = encodeURIComponent(roomId);
-    const encodedEventId =
-      typeof eventId === 'string' && eventId.trim()
-        ? `/${encodeURIComponent(eventId)}`
-        : '';
-    return buildAppUrl(`${HOME_PATH}${encodedRoomId}${encodedEventId}/`, session);
+    return buildAppUrlWithQuery(session, params);
   }
 
   if (typeof url === 'string' && url.trim()) return url;
@@ -479,6 +402,11 @@ const onPushNotification = async (event: PushEvent) => {
       if (pushData.data) {
         options.data = { ...options.data, ...pushData.data };
       }
+      if (roomId) options.data = { ...options.data, pushRoomId: roomId };
+      if (eventId) options.data = { ...options.data, pushEventId: eventId };
+      if (isInviteEvent(pushData)) {
+        options.data = { ...options.data, pushAction: 'invites' };
+      }
       if (typeof pushData.unread === 'number') {
         try {
           self.navigator.setAppBadge(pushData.unread);
@@ -510,6 +438,9 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close();
 
   const targetUrl = event.notification.data?.url || self.registration.scope;
+  const pushRoomId = event.notification.data?.pushRoomId;
+  const pushEventId = event.notification.data?.pushEventId;
+  const pushAction = event.notification.data?.pushAction;
 
   event.waitUntil(
     (async () => {
@@ -518,7 +449,15 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
         includeUncontrolled: true,
       });
       for (const client of clientList) {
-        if (client.url === targetUrl && 'focus' in client) {
+        if ('postMessage' in client) {
+          (client as WindowClient).postMessage({
+            type: 'pushNavigate',
+            roomId: pushRoomId,
+            eventId: pushEventId,
+            action: pushAction,
+          });
+        }
+        if ('focus' in client) {
           await (client as WindowClient).focus();
           return;
         }
