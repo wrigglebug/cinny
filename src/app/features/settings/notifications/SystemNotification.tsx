@@ -10,6 +10,7 @@ import { settingsAtom } from '../../../state/settings';
 import { getNotificationState, usePermissionState } from '../../../hooks/usePermission';
 import { useEmailNotifications } from '../../../hooks/useEmailNotifications';
 import { AsyncStatus, useAsyncCallback } from '../../../hooks/useAsyncCallback';
+import { useMatrixClient } from '../../../hooks/useMatrixClient';
 import {
   disablePushNotifications,
   enablePushNotifications,
