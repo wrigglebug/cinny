@@ -37,6 +37,8 @@ export interface Settings {
   usePushNotifications: boolean;
   useInAppNotifications: boolean;
   isNotificationSounds: boolean;
+  showPushNotificationContent: boolean;
+  openDirectOnPush: boolean;
 
   hour24Clock: boolean;
   dateFormatString: string;
@@ -72,6 +74,8 @@ const defaultSettings: Settings = {
   usePushNotifications: false,
   useInAppNotifications: true,
   isNotificationSounds: true,
+  showPushNotificationContent: false,
+  openDirectOnPush: false,
 
   hour24Clock: false,
   dateFormatString: 'D MMM YYYY',

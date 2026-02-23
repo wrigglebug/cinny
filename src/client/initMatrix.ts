@@ -5,9 +5,14 @@ import { SlidingSyncController } from './SlidingSyncController';
 import { clearNavToActivePathStore } from '../app/state/navToActivePath';
 import { pushSessionToSW } from '../sw-session';
 import { Session, getSessionStoreName } from '../app/state/sessions';
+import { getSettings } from '../app/state/settings';
 
 export const initClient = async (session: Session): Promise<MatrixClient> => {
-  pushSessionToSW(session.baseUrl, session.accessToken, session.userId);
+  const settings = getSettings();
+  pushSessionToSW(session.baseUrl, session.accessToken, session.userId, {
+    showPushNotificationContent: settings.showPushNotificationContent,
+    openDirectOnPush: settings.openDirectOnPush,
+  });
   const storeName = getSessionStoreName(session);
   const indexedDBStore = new IndexedDBStore({
     indexedDB: global.indexedDB,

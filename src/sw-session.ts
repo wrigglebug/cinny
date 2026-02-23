@@ -1,4 +1,14 @@
-export function pushSessionToSW(baseUrl?: string, accessToken?: string, userId?: string) {
+export type PushNotificationSettings = {
+  showPushNotificationContent?: boolean;
+  openDirectOnPush?: boolean;
+};
+
+export function pushSessionToSW(
+  baseUrl?: string,
+  accessToken?: string,
+  userId?: string,
+  notificationSettings?: PushNotificationSettings
+) {
   if (!('serviceWorker' in navigator)) return;
   const post = () => {
     navigator.serviceWorker.controller?.postMessage({
@@ -6,6 +16,7 @@ export function pushSessionToSW(baseUrl?: string, accessToken?: string, userId?:
       accessToken,
       baseUrl,
       userId,
+      notificationSettings,
     });
   };
 

@@ -7,11 +7,15 @@ declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST?: unknown[] };
 const DEFAULT_NOTIFICATION_ICON = '/public/res/apple/apple-touch-icon-180x180.png';
 const DEFAULT_NOTIFICATION_BADGE = '/public/res/apple/apple-touch-icon-72x72.png';
 const PUSH_EVENT_LOOKUP_TIMEOUT_MS = 2500;
+const INBOX_NOTIFICATIONS_PATH = '/inbox/notifications/';
+const HOME_PATH = '/home/';
 
 type SessionInfo = {
   accessToken: string;
   baseUrl: string;
   userId: string;
+  showPushNotificationContent: boolean;
+  openDirectOnPush: boolean;
 };
 
 /**
@@ -19,6 +23,8 @@ type SessionInfo = {
  */
 const sessions = new Map<string, SessionInfo>();
 let latestSession: SessionInfo | undefined;
+const directRoomCache = new Map<string, { value: boolean; timestamp: number }>();
+const DIRECT_ROOM_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const clientToResolve = new Map<string, (value: SessionInfo | undefined) => void>();
 const clientToSessionPromise = new Map<string, Promise<SessionInfo | undefined>>();
@@ -36,15 +42,31 @@ async function cleanupDeadClients() {
   });
 }
 
-function setSession(clientId: string, accessToken: any, baseUrl: any, userId: any) {
+function setSession(
+  clientId: string,
+  accessToken: any,
+  baseUrl: any,
+  userId: any,
+  notificationSettings?: {
+    showPushNotificationContent?: boolean;
+    openDirectOnPush?: boolean;
+  }
+) {
   if (
     typeof accessToken === 'string' &&
     typeof baseUrl === 'string' &&
     typeof userId === 'string'
   ) {
-    const session = { accessToken, baseUrl, userId };
+    const session = {
+      accessToken,
+      baseUrl,
+      userId,
+      showPushNotificationContent: !!notificationSettings?.showPushNotificationContent,
+      openDirectOnPush: !!notificationSettings?.openDirectOnPush,
+    };
     sessions.set(clientId, session);
     latestSession = session;
+    directRoomCache.clear();
   } else {
     // Logout or invalid session
     sessions.delete(clientId);
@@ -109,7 +131,8 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
   const client = event.source as Client | null;
   if (!client) return;
 
-  const { type, accessToken, baseUrl, userId, token, url, pusherData } = event.data || {};
+  const { type, accessToken, baseUrl, userId, notificationSettings, token, url, pusherData } =
+    event.data || {};
 
   if (type === 'togglePush') {
     if (!token || !url) return;
@@ -125,7 +148,7 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
   }
 
   if (type === 'setSession') {
-    setSession(client.id, accessToken, baseUrl, userId);
+    setSession(client.id, accessToken, baseUrl, userId, notificationSettings);
     cleanupDeadClients();
   }
 });
@@ -186,6 +209,75 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | und
     setTimeout(() => resolve(undefined), timeoutMs);
   });
   return Promise.race([promise, timeout]);
+}
+
+async function isDirectRoom(session: SessionInfo, roomId: string): Promise<boolean> {
+  const cached = directRoomCache.get(roomId);
+  const now = Date.now();
+  if (cached && now - cached.timestamp < DIRECT_ROOM_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
+  const url = new URL(
+    `/_matrix/client/v3/user/${encodeURIComponent(session.userId)}/account_data/m.direct`,
+    session.baseUrl
+  );
+  try {
+    const response = await fetch(url, fetchConfig(session.accessToken));
+    if (!response.ok) return false;
+    const data = (await response.json()) as Record<string, string[]>;
+    const isDirect = Object.values(data ?? {}).some((roomIds) => roomIds.includes(roomId));
+    directRoomCache.set(roomId, { value: isDirect, timestamp: now });
+    return isDirect;
+  } catch {
+    return false;
+  }
+}
+
+function resolveNotificationBody(pushData: any): string | undefined {
+  if (typeof pushData?.body === 'string' && pushData.body.trim()) return pushData.body;
+  const dataBody = pushData?.data?.content?.body ?? pushData?.data?.body;
+  if (typeof dataBody === 'string' && dataBody.trim()) return dataBody;
+  return undefined;
+}
+
+function resolveNotificationTitle(pushData: any, fallback: string): string {
+  if (typeof pushData?.title === 'string' && pushData.title.trim()) return pushData.title;
+  const roomName = pushData?.data?.room_name ?? pushData?.room_name;
+  if (typeof roomName === 'string' && roomName.trim()) return roomName;
+  return fallback;
+}
+
+async function resolveNotificationUrl(
+  pushData: any,
+  session?: SessionInfo
+): Promise<string> {
+  const url = pushData?.data?.url ?? pushData?.url;
+  if (typeof url === 'string' && url.trim()) return url;
+
+  const roomId = pushData?.room_id ?? pushData?.data?.room_id;
+  const eventId = pushData?.event_id ?? pushData?.data?.event_id;
+  if (typeof roomId === 'string' && roomId.trim()) {
+    if (session?.openDirectOnPush) {
+      const isDirect = await withTimeout(isDirectRoom(session, roomId), PUSH_EVENT_LOOKUP_TIMEOUT_MS);
+      if (isDirect) {
+        const encodedRoomId = encodeURIComponent(roomId);
+        const encodedEventId =
+          typeof eventId === 'string' && eventId.trim()
+            ? `/${encodeURIComponent(eventId)}`
+            : '';
+        return new URL(`/direct/${encodedRoomId}${encodedEventId}`, self.registration.scope).href;
+      }
+    }
+    const encodedRoomId = encodeURIComponent(roomId);
+    const encodedEventId =
+      typeof eventId === 'string' && eventId.trim()
+        ? `/${encodeURIComponent(eventId)}`
+        : '';
+    return new URL(`${HOME_PATH}${encodedRoomId}${encodedEventId}`, self.registration.scope).href;
+  }
+
+  return new URL(INBOX_NOTIFICATIONS_PATH, self.registration.scope).href;
 }
 
 self.addEventListener('fetch', (event: FetchEvent) => {
@@ -250,10 +342,16 @@ const onPushNotification = async (event: PushEvent) => {
           return;
         }
       }
-      title = pushData.title || title;
-      options.body = options.body ?? pushData.data?.toString();
+      title = resolveNotificationTitle(pushData, title);
+      if (session?.showPushNotificationContent) {
+        options.body = resolveNotificationBody(pushData) ?? options.body;
+      }
       options.icon = pushData.icon || options.icon;
       options.badge = pushData.badge || options.badge;
+      options.data = {
+        ...options.data,
+        url: await resolveNotificationUrl(pushData, session),
+      };
 
       if (pushData.image) options.image = pushData.image;
       if (pushData.vibrate) options.vibrate = pushData.vibrate;

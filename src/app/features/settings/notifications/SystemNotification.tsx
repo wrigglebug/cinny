@@ -11,6 +11,7 @@ import { getNotificationState, usePermissionState } from '../../../hooks/usePerm
 import { useEmailNotifications } from '../../../hooks/useEmailNotifications';
 import { AsyncStatus, useAsyncCallback } from '../../../hooks/useAsyncCallback';
 import { useMatrixClient } from '../../../hooks/useMatrixClient';
+import { pushSessionToSW } from '../../../../sw-session';
 import {
   disablePushNotifications,
   enablePushNotifications,
@@ -164,6 +165,7 @@ function WebPushNotificationSetting() {
 }
 
 export function SystemNotification() {
+  const mx = useMatrixClient();
   const [showInAppNotifs, setShowInAppNotifs] = useSetting(
     settingsAtom,
     'useInAppNotifications'
@@ -172,6 +174,18 @@ export function SystemNotification() {
     settingsAtom,
     'isNotificationSounds'
   );
+  const [showPushNotificationContent, setShowPushNotificationContent] = useSetting(
+    settingsAtom,
+    'showPushNotificationContent'
+  );
+  const [openDirectOnPush, setOpenDirectOnPush] = useSetting(settingsAtom, 'openDirectOnPush');
+
+  useEffect(() => {
+    pushSessionToSW(mx.baseUrl, mx.getAccessToken(), mx.getUserId() ?? undefined, {
+      showPushNotificationContent,
+      openDirectOnPush,
+    });
+  }, [mx, showPushNotificationContent, openDirectOnPush]);
 
   return (
     <Box direction="Column" gap="100">
@@ -183,6 +197,28 @@ export function SystemNotification() {
         gap="400"
       >
         <WebPushNotificationSetting />
+      </SequenceCard>
+      <SequenceCard
+        className={SequenceCardStyle}
+        variant="SurfaceVariant"
+        direction="Column"
+        gap="400"
+      >
+        <SettingTile
+          title="Push Notification Content"
+          description="Show message content in push notifications."
+          after={
+            <Switch
+              value={showPushNotificationContent}
+              onChange={setShowPushNotificationContent}
+            />
+          }
+        />
+        <SettingTile
+          title="Open Directs From Push"
+          description="Open direct messages in `/direct/` when a push notification is clicked."
+          after={<Switch value={openDirectOnPush} onChange={setOpenDirectOnPush} />}
+        />
       </SequenceCard>
       <SequenceCard
         className={SequenceCardStyle}

@@ -17,6 +17,7 @@ import App from './app/pages/App';
 import './app/i18n';
 import { pushSessionToSW } from './sw-session';
 import { getSecret } from './client/state/auth';
+import { getSettings } from './app/state/settings';
 
 document.body.classList.add(configClass, varsClass);
 
@@ -29,7 +30,11 @@ if ('serviceWorker' in navigator) {
 
   const sendSessionToSW = () => {
     const session = getSecret();
-    pushSessionToSW(session?.baseUrl, session?.accessToken, session?.userId);
+    const settings = getSettings();
+    pushSessionToSW(session?.baseUrl, session?.accessToken, session?.userId, {
+      showPushNotificationContent: settings.showPushNotificationContent,
+      openDirectOnPush: settings.openDirectOnPush,
+    });
   };
 
   navigator.serviceWorker.register(swUrl, { type: swType }).then(sendSessionToSW);
