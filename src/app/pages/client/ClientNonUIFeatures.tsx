@@ -11,6 +11,8 @@ import InviteSound from '../../../../public/sound/invite.ogg';
 import { notificationPermission, setFavicon } from '../../utils/dom';
 import { useSetting } from '../../state/hooks/settings';
 import { settingsAtom } from '../../state/settings';
+import { pushSessionToSW } from '../../../sw-session';
+import { usePathWithOrigin } from '../../hooks/usePathWithOrigin';
 import { allInvitesAtom } from '../../state/room-list/inviteList';
 import { usePreviousValue } from '../../hooks/usePreviousValue';
 import { useMatrixClient } from '../../hooks/useMatrixClient';
@@ -263,6 +265,26 @@ function MessageNotifications() {
   );
 }
 
+function PushNotificationBridge() {
+  const mx = useMatrixClient();
+  const appBaseUrl = usePathWithOrigin('');
+  const [showPushNotificationContent] = useSetting(
+    settingsAtom,
+    'showPushNotificationContent'
+  );
+  const [openDirectOnPush] = useSetting(settingsAtom, 'openDirectOnPush');
+
+  useEffect(() => {
+    pushSessionToSW(mx.baseUrl, mx.getAccessToken(), mx.getUserId() ?? undefined, {
+      showPushNotificationContent,
+      openDirectOnPush,
+      appBaseUrl,
+    });
+  }, [mx, showPushNotificationContent, openDirectOnPush, appBaseUrl]);
+
+  return null;
+}
+
 type ClientNonUIFeaturesProps = {
   children: ReactNode;
 };
@@ -275,6 +297,7 @@ export function ClientNonUIFeatures({ children }: ClientNonUIFeaturesProps) {
       <FaviconUpdater />
       <InviteNotifications />
       <MessageNotifications />
+      <PushNotificationBridge />
       {children}
     </>
   );

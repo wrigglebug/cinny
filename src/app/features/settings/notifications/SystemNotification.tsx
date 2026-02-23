@@ -10,8 +10,6 @@ import { settingsAtom } from '../../../state/settings';
 import { getNotificationState, usePermissionState } from '../../../hooks/usePermission';
 import { useEmailNotifications } from '../../../hooks/useEmailNotifications';
 import { AsyncStatus, useAsyncCallback } from '../../../hooks/useAsyncCallback';
-import { useMatrixClient } from '../../../hooks/useMatrixClient';
-import { pushSessionToSW } from '../../../../sw-session';
 import {
   disablePushNotifications,
   enablePushNotifications,
@@ -165,7 +163,6 @@ function WebPushNotificationSetting() {
 }
 
 export function SystemNotification() {
-  const mx = useMatrixClient();
   const [showInAppNotifs, setShowInAppNotifs] = useSetting(
     settingsAtom,
     'useInAppNotifications'
@@ -179,13 +176,6 @@ export function SystemNotification() {
     'showPushNotificationContent'
   );
   const [openDirectOnPush, setOpenDirectOnPush] = useSetting(settingsAtom, 'openDirectOnPush');
-
-  useEffect(() => {
-    pushSessionToSW(mx.baseUrl, mx.getAccessToken(), mx.getUserId() ?? undefined, {
-      showPushNotificationContent,
-      openDirectOnPush,
-    });
-  }, [mx, showPushNotificationContent, openDirectOnPush]);
 
   return (
     <Box direction="Column" gap="100">

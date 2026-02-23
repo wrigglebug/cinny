@@ -7,8 +7,8 @@ declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST?: unknown[] };
 const DEFAULT_NOTIFICATION_ICON = '/public/res/apple/apple-touch-icon-180x180.png';
 const DEFAULT_NOTIFICATION_BADGE = '/public/res/apple/apple-touch-icon-72x72.png';
 const PUSH_EVENT_LOOKUP_TIMEOUT_MS = 2500;
-const INBOX_NOTIFICATIONS_PATH = '/inbox/notifications/';
-const HOME_PATH = '/home/';
+const INBOX_NOTIFICATIONS_PATH = 'inbox/notifications/';
+const HOME_PATH = 'home/';
 
 type SessionInfo = {
   accessToken: string;
@@ -16,6 +16,7 @@ type SessionInfo = {
   userId: string;
   showPushNotificationContent: boolean;
   openDirectOnPush: boolean;
+  appBaseUrl?: string;
 };
 
 /**
@@ -50,6 +51,7 @@ function setSession(
   notificationSettings?: {
     showPushNotificationContent?: boolean;
     openDirectOnPush?: boolean;
+    appBaseUrl?: string;
   }
 ) {
   if (
@@ -63,6 +65,7 @@ function setSession(
       userId,
       showPushNotificationContent: !!notificationSettings?.showPushNotificationContent,
       openDirectOnPush: !!notificationSettings?.openDirectOnPush,
+      appBaseUrl: notificationSettings?.appBaseUrl,
     };
     sessions.set(clientId, session);
     latestSession = session;
@@ -248,6 +251,14 @@ function resolveNotificationTitle(pushData: any, fallback: string): string {
   return fallback;
 }
 
+function buildAppUrl(path: string, session?: SessionInfo): string {
+  if (session?.appBaseUrl) {
+    const base = session.appBaseUrl.endsWith('/') ? session.appBaseUrl : `${session.appBaseUrl}/`;
+    return `${base}${path.replace(/^\//, '')}`;
+  }
+  return new URL(path.replace(/^\//, ''), self.registration.scope).href;
+}
+
 async function resolveNotificationUrl(
   pushData: any,
   session?: SessionInfo
@@ -266,7 +277,7 @@ async function resolveNotificationUrl(
           typeof eventId === 'string' && eventId.trim()
             ? `/${encodeURIComponent(eventId)}`
             : '';
-        return new URL(`/direct/${encodedRoomId}${encodedEventId}`, self.registration.scope).href;
+        return buildAppUrl(`direct/${encodedRoomId}${encodedEventId}`, session);
       }
     }
     const encodedRoomId = encodeURIComponent(roomId);
@@ -274,10 +285,10 @@ async function resolveNotificationUrl(
       typeof eventId === 'string' && eventId.trim()
         ? `/${encodeURIComponent(eventId)}`
         : '';
-    return new URL(`${HOME_PATH}${encodedRoomId}${encodedEventId}`, self.registration.scope).href;
+    return buildAppUrl(`${HOME_PATH}${encodedRoomId}${encodedEventId}`, session);
   }
 
-  return new URL(INBOX_NOTIFICATIONS_PATH, self.registration.scope).href;
+  return buildAppUrl(INBOX_NOTIFICATIONS_PATH, session);
 }
 
 self.addEventListener('fetch', (event: FetchEvent) => {
