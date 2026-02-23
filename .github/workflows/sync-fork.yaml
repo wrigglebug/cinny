@@ -21,6 +21,6 @@ jobs:
 
       - name: Merge Changes and Push
         run: |
-          git checkout main
-          git merge upstream/main
-          git push origin main
+          git checkout dev
+          git merge upstream/dev
+          git push origin dev
