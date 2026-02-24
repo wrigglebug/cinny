@@ -217,6 +217,21 @@ export const getEventIdAbsoluteIndex = (
   return baseIndex + eventIndex;
 };
 
+/**
+ * NOTE: Virtualized renderers do not guarantee that items render strictly in order.
+ * Any "previous item" logic must be computed deterministically from the absolute index.
+ */
+export const getPrevEventForIndex = (
+  timelines: EventTimeline[],
+  absoluteIndex: number
+): MatrixEvent | undefined => {
+  if (absoluteIndex <= 0) return undefined;
+  const prevIndex = absoluteIndex - 1;
+  const [prevTimeline, prevBaseIndex] = getTimelineAndBaseIndex(timelines, prevIndex);
+  if (!prevTimeline) return undefined;
+  return getTimelineEvent(prevTimeline, getTimelineRelativeIndex(prevIndex, prevBaseIndex));
+};
+
 type RoomTimelineProps = {
   room: Room;
   eventId?: string;
@@ -599,6 +614,10 @@ export function RoomTimeline({
     room,
     useCallback(
       (mEvt: MatrixEvent) => {
+        // Keep our view of linked timelines in sync with the Room's live timeline.
+        // This avoids stale absolute-index mappings when new events are injected.
+        const refreshFromRoom = () => getLinkedTimelines(getLiveTimeline(room));
+
         if (atBottomRef.current) {
           if (document.hasFocus() && (!unreadInfo || mEvt.getSender() === mx.getUserId())) {
             requestAnimationFrame(() => markAsRead(mx, mEvt.getRoomId()!, hideActivity));
@@ -611,16 +630,26 @@ export function RoomTimeline({
           scrollToBottomRef.current.count += 1;
           scrollToBottomRef.current.smooth = true;
 
-          setTimeline((ct) => ({
-            ...ct,
-            range: {
-              start: ct.range.start + 1,
-              end: ct.range.end + 1,
-            },
-          }));
+          setTimeline((ct) => {
+            const linkedTimelines = refreshFromRoom();
+            const evLength = getTimelinesEventsCount(linkedTimelines);
+            return {
+              linkedTimelines,
+              range: {
+                start: Math.min(ct.range.start + 1, evLength),
+                end: Math.min(ct.range.end + 1, evLength),
+              },
+            };
+          });
           return;
         }
-        setTimeline((ct) => ({ ...ct }));
+
+        // Not at bottom: still refresh linked timelines, but keep range.
+        setTimeline((ct) => ({
+          linkedTimelines: refreshFromRoom(),
+          range: { ...ct.range },
+        }));
+
         if (!unreadInfo) {
           setUnreadInfo(getRoomUnreadInfo(room));
         }
@@ -1506,14 +1535,10 @@ export function RoomTimeline({
     }
   );
 
-  let prevEvent: MatrixEvent | undefined;
-  let isPrevRendered = false;
-  let newDivider = false;
-  let dayDivider = false;
   const eventRenderer = (item: number) => {
     const [eventTimeline, baseIndex] = getTimelineAndBaseIndex(timeline.linkedTimelines, item);
     if (!eventTimeline) return null;
-    const timelineSet = eventTimeline?.getTimelineSet();
+    const timelineSet = eventTimeline.getTimelineSet();
     const mEvent = getTimelineEvent(eventTimeline, getTimelineRelativeIndex(item, baseIndex));
     const mEventId = mEvent?.getId();
 
@@ -1527,18 +1552,18 @@ export function RoomTimeline({
       return null;
     }
 
-    if (!newDivider && readUptoEventIdRef.current) {
-      newDivider = prevEvent?.getId() === readUptoEventIdRef.current;
-    }
-    if (!dayDivider) {
-      dayDivider = prevEvent ? !inSameDay(prevEvent.getTs(), mEvent.getTs()) : false;
-    }
+    // Deterministic adjacency: derive "previous event" from absolute index, not render order.
+    const prevEvent = getPrevEventForIndex(timeline.linkedTimelines, item);
+
+    const newDivider =
+      !!readUptoEventIdRef.current && prevEvent?.getId() === readUptoEventIdRef.current;
+
+    const dayDivider = !!prevEvent && !inSameDay(prevEvent.getTs(), mEvent.getTs());
 
     const collapsed =
-      isPrevRendered &&
+      !!prevEvent &&
       !dayDivider &&
       (!newDivider || eventSender === mx.getUserId()) &&
-      prevEvent !== undefined &&
       prevEvent.getSender() === eventSender &&
       prevEvent.getType() === mEvent.getType() &&
       minuteDifference(prevEvent.getTs(), mEvent.getTs()) < 2;
@@ -1554,8 +1579,6 @@ export function RoomTimeline({
           timelineSet,
           collapsed
         );
-    prevEvent = mEvent;
-    isPrevRendered = !!eventJSX;
 
     const newDividerJSX =
       newDivider && eventJSX && eventSender !== mx.getUserId() ? (
@@ -1586,9 +1609,6 @@ export function RoomTimeline({
       ) : null;
 
     if (eventJSX && (newDividerJSX || dayDividerJSX)) {
-      if (newDividerJSX) newDivider = false;
-      if (dayDividerJSX) dayDivider = false;
-
       return (
         <React.Fragment key={mEventId}>
           {newDividerJSX}
