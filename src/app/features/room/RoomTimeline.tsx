@@ -383,7 +383,11 @@ const useLiveEventArrive = (room: Room, onArrive: (mEvent: MatrixEvent) => void)
     ) => {
       if (eventRoom?.roomId !== room.roomId) return;
       if (removed) return;
-      if (!data?.liveEvent) return;
+      // Sliding Sync and some JS-SDK versions do not always set `data.liveEvent`.
+      // Treat events as live unless the SDK explicitly marks them as non-live.
+      const isExplicitlyNotLive =
+        !!data && 'liveEvent' in (data as any) && (data as any).liveEvent === false;
+      if (isExplicitlyNotLive) return;
       if (toStartOfTimeline) return;
       onArrive(mEvent);
     };
@@ -1589,15 +1593,22 @@ export function RoomTimeline({
 
     const newDivider = typeof readMarkerAbsIndex === 'number' && item === readMarkerAbsIndex + 1;
 
-    const dayDivider = !!prevEvent && !inSameDay(prevEvent.getTs(), mEvent.getTs());
+    const prevTs = prevEvent?.getTs();
+    const curTs = mEvent.getTs();
+    // Matrix timeline order can be correct even when timestamps are non-monotonic.
+    // Guard grouping UI (day dividers/collapsing) against "time going backwards".
+    const tsBackwards = typeof prevTs === 'number' && prevTs > curTs;
+
+    const dayDivider = !!prevEvent && !tsBackwards && !inSameDay(prevTs!, curTs);
 
     const collapsed =
       !!prevEvent &&
       !dayDivider &&
+      !tsBackwards &&
       (!newDivider || eventSender === mx.getUserId()) &&
       prevEvent.getSender() === eventSender &&
       prevEvent.getType() === mEvent.getType() &&
-      minuteDifference(prevEvent.getTs(), mEvent.getTs()) < 2;
+      minuteDifference(prevTs!, curTs) < 2;
 
     const eventJSX = reactionOrEditEvent(mEvent)
       ? null
