@@ -17,9 +17,9 @@ export const UrlPreview = style([
 export const UrlPreviewImg = style([
   DefaultReset,
   {
-    width: toRem(100),
-    height: toRem(100),
-    objectFit: 'cover',
+    width: '100%',
+    height: toRem(200),
+    objectFit: 'contain',
     objectPosition: 'center',
     flexShrink: 0,
     overflow: 'hidden',

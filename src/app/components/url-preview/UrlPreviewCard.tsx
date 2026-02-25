@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { IPreviewUrlResponse } from 'matrix-js-sdk';
-import { Box, Icon, IconButton, Icons, Scroll, Spinner, Text, as, color, config } from 'folds';
+import { Box, Icon, IconButton, Icons, Scroll, Spinner, Text, as, color, config, Modal, Overlay, OverlayBackdrop, OverlayCenter } from 'folds';
+import FocusTrap from 'focus-trap-react';
 import { AsyncStatus, useAsyncCallback } from '../../hooks/useAsyncCallback';
 import { useMatrixClient } from '../../hooks/useMatrixClient';
 import { UrlPreview, UrlPreviewContent, UrlPreviewDescription, UrlPreviewImg } from './UrlPreview';
@@ -12,6 +13,9 @@ import * as css from './UrlPreviewCard.css';
 import { tryDecodeURIComponent } from '../../utils/dom';
 import { mxcUrlToHttp } from '../../utils/matrix';
 import { useMediaAuthentication } from '../../hooks/useMediaAuthentication';
+import { ImageViewer } from '../image-viewer';
+import { ModalWide } from '../../styles/Modal.css';
+import { stopPropagation } from '../../utils/keyboard';
 
 const linkStyles = { color: color.Success.Main };
 
@@ -22,6 +26,7 @@ export const UrlPreviewCard = as<'div', { url: string; ts: number }>(
     const [previewStatus, loadPreview] = useAsyncCallback(
       useCallback(() => mx.getUrlPreview(url, ts), [url, ts, mx])
     );
+    const [viewer, setViewer] = useState(false);
 
     useEffect(() => {
       loadPreview();
@@ -42,7 +47,6 @@ export const UrlPreviewCard = as<'div', { url: string; ts: number }>(
 
       return (
         <>
-          {imgUrl && <UrlPreviewImg src={imgUrl} alt={prev['og:title']} title={prev['og:title']} />}
           <UrlPreviewContent>
             <Text
               style={linkStyles}
@@ -64,6 +68,48 @@ export const UrlPreviewCard = as<'div', { url: string; ts: number }>(
               <UrlPreviewDescription>{prev['og:description']}</UrlPreviewDescription>
             </Text>
           </UrlPreviewContent>
+          {imgUrl && (
+            <>
+              <UrlPreviewImg 
+                src={imgUrl} 
+                alt={prev['og:title']} 
+                title={prev['og:title']}
+                onClick={() => setViewer(true)}
+                style={{ cursor: 'pointer' }}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setViewer(true);
+                  }
+                }}
+              />
+              <Overlay open={viewer} backdrop={<OverlayBackdrop />}>
+                <OverlayCenter>
+                  <FocusTrap
+                    focusTrapOptions={{
+                      initialFocus: false,
+                      onDeactivate: () => setViewer(false),
+                      clickOutsideDeactivates: true,
+                      escapeDeactivates: stopPropagation,
+                    }}
+                  >
+                    <Modal
+                      className={ModalWide}
+                      size="500"
+                      onContextMenu={(evt: any) => evt.stopPropagation()}
+                    >
+                      <ImageViewer
+                        src={imgUrl}
+                        alt={prev['og:title'] || 'Preview image'}
+                        requestClose={() => setViewer(false)}
+                      />
+                    </Modal>
+                  </FocusTrap>
+                </OverlayCenter>
+              </Overlay>
+            </>
+          )}
         </>
       );
     };
