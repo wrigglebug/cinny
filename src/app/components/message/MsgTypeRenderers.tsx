@@ -195,13 +195,18 @@ export function MImage({ content, renderImageContent, outlined }: MImageProps) {
   if (typeof mxcUrl !== 'string') {
     return <BrokenContent />;
   }
-  const height = scaleYDimension(imgInfo?.w || 400, 400, imgInfo?.h || 400);
+  const width = imgInfo?.w || 400;
+  const height = imgInfo?.h || 400;
+  const scale = Math.min(400 / width, 320 / height, 1);
+  const scaledWidth = width * scale;
+  const scaledHeight = height * scale;
 
   return (
     <Attachment outlined={outlined}>
       <AttachmentBox
         style={{
-          height: toRem(height < 48 ? 48 : height),
+          width: toRem(scaledWidth),
+          height: toRem(scaledHeight < 48 ? 48 : scaledHeight),
         }}
       >
         {renderImageContent({
@@ -245,12 +250,16 @@ export function MVideo({ content, renderAsFile, renderVideoContent, outlined }: 
     return <BrokenContent />;
   }
 
-  const height = scaleYDimension(videoInfo.w || 400, 400, videoInfo.h || 400);
+  const width = videoInfo.w || 400;
+  const height = videoInfo.h || 400;
+  const scale = Math.min(400 / width, 320 / height, 1);
+  const scaledWidth = width * scale;
+  const scaledHeight = height * scale;
 
   const filename = content.filename ?? content.body ?? 'Video';
 
   return (
-    <Attachment outlined={outlined}>
+    <Attachment outlined={outlined} style={{ maxWidth: toRem(scaledWidth) }}>
       <AttachmentHeader>
         <FileHeader
           body={filename}
@@ -267,7 +276,8 @@ export function MVideo({ content, renderAsFile, renderVideoContent, outlined }: 
       </AttachmentHeader>
       <AttachmentBox
         style={{
-          height: toRem(height < 48 ? 48 : height),
+          width: toRem(scaledWidth),
+          height: toRem(scaledHeight < 48 ? 48 : scaledHeight),
         }}
       >
         {renderVideoContent({
@@ -418,13 +428,17 @@ export function MSticker({ content, renderImageContent }: MStickerProps) {
   if (typeof mxcUrl !== 'string') {
     return <MessageBrokenContent />;
   }
-  const height = scaleYDimension(imgInfo?.w || 152, 152, imgInfo?.h || 152);
+  const width = imgInfo?.w || 152;
+  const height = imgInfo?.h || 152;
+  const scale = Math.min(152 / width, 152 / height, 1);
+  const scaledWidth = width * scale;
+  const scaledHeight = height * scale;
 
   return (
     <AttachmentBox
       style={{
-        height: toRem(height < 48 ? 48 : height),
-        width: toRem(152),
+        width: toRem(scaledWidth),
+        height: toRem(scaledHeight < 48 ? 48 : scaledHeight),
       }}
     >
       {renderImageContent({

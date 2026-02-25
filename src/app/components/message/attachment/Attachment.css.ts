@@ -9,7 +9,6 @@ export const Attachment = recipe({
     borderRadius: config.radii.R400,
     overflow: 'hidden',
     maxWidth: '100%',
-    width: toRem(400),
   },
   variants: {
     outlined: {
@@ -23,15 +22,13 @@ export const Attachment = recipe({
 export type AttachmentVariants = RecipeVariants<typeof Attachment>;
 
 export const AttachmentHeader = style({
-  padding: config.space.S300,
+  padding: config.space.S100,
 });
 
 export const AttachmentBox = style([
   DefaultReset,
   {
     maxWidth: '100%',
-    maxHeight: toRem(600),
-    width: toRem(400),
     overflow: 'hidden',
   },
 ]);
