@@ -24,6 +24,15 @@ export const ImageViewer = as<'div', ImageViewerProps>(
       FileSaver.saveAs(fileContent, alt);
     };
 
+    const handleWheel = (event: React.WheelEvent) => {
+      event.preventDefault();
+      if (event.deltaY < 0) {
+        zoomIn();
+      } else if (event.deltaY > 0) {
+        zoomOut();
+      }
+    };
+
     return (
       <Box
         className={classNames(css.ImageViewer, className)}
@@ -79,6 +88,7 @@ export const ImageViewer = as<'div', ImageViewerProps>(
           className={css.ImageViewerContent}
           justifyContent="Center"
           alignItems="Center"
+          onWheel={handleWheel}
         >
           <img
             className={css.ImageViewerImg}
