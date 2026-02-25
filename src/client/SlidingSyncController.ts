@@ -13,13 +13,13 @@ import {
 import { logger } from 'matrix-js-sdk/lib/logger';
 import { sleep } from 'matrix-js-sdk/lib/utils';
 
-const SYNC_TIMEOUT_MS = 20000;
 const INITIAL_SYNC_TIMEOUT_MS = 20000;
 
-/** * Core state events required across the application for proper rendering.
+/**
+ * Core state events required across the application for proper rendering.
  * Includes standard room metadata, VoIP, and MSC2545 emotes/stickers.
  */
-const BASE_STATE_REQUIREMENTS = [
+const BASE_STATE_REQUIREMENTS: [string, string][] = [
   [EventType.RoomJoinRules, ''],
   [EventType.RoomAvatar, ''],
   [EventType.RoomCanonicalAlias, ''],
@@ -43,33 +43,55 @@ const BASE_STATE_REQUIREMENTS = [
   ['m.image_pack', MSC3575_WILDCARD],
   ['m.image_pack.aggregate', MSC3575_WILDCARD],
 
-  // Just throw these in I guess
+  // Misc
   ['in.cinny.room.power_level_tags', MSC3575_WILDCARD],
   ['org.matrix.msc3381.poll.response', MSC3575_WILDCARD],
   ['com.famedly.marked_unread', MSC3575_WILDCARD],
 ];
 
+// IMPORTANT: Always request BASE_STATE_REQUIREMENTS for subscriptions.
+// Your old UNENCRYPTED subscription did NOT include these, which can lead to
+// missing/misaligned room state and weird UI behavior.
 const SUBSCRIPTION_BASE = {
   timeline_limit: 50,
+  required_state: BASE_STATE_REQUIREMENTS,
   include_old_rooms: {
     timeline_limit: 0,
     required_state: BASE_STATE_REQUIREMENTS,
   },
 };
 
+// Keep custom subscription support, but make them SAFE (include BASE_STATE_REQUIREMENTS).
 const SUBSCRIPTIONS = {
+  /**
+   * Default subscription should be "safe + reasonably small":
+   * - BASE_STATE_REQUIREMENTS (room metadata, encryption state, etc.)
+   * - LAZY members so sender displaynames/avatars resolve as events arrive.
+   */
+  DEFAULT: {
+    ...SUBSCRIPTION_BASE,
+    required_state: [...BASE_STATE_REQUIREMENTS, [EventType.RoomMember, MSC3575_STATE_KEY_LAZY]],
+  },
+
+  /**
+   * Unencrypted can also use lazy members, but MUST keep BASE_STATE_REQUIREMENTS.
+   * (If you want to further reduce bandwidth for unencrypted rooms, do it with
+   * timeline_limit or by trimming BASE_STATE_REQUIREMENTS, not by dropping it.)
+   */
   UNENCRYPTED: {
     ...SUBSCRIPTION_BASE,
-    required_state: [
-      [EventType.RoomMember, MSC3575_STATE_KEY_ME],
-      [EventType.RoomMember, MSC3575_STATE_KEY_LAZY],
-    ],
+    required_state: [...BASE_STATE_REQUIREMENTS, [EventType.RoomMember, MSC3575_STATE_KEY_LAZY]],
   },
+
+  /**
+   * Encrypted rooms do NOT need wildcard required_state. That is extremely heavy.
+   * Keep BASE_STATE_REQUIREMENTS + lazy members.
+   */
   ENCRYPTED: {
     ...SUBSCRIPTION_BASE,
-    required_state: [[MSC3575_WILDCARD, MSC3575_WILDCARD]],
+    required_state: [...BASE_STATE_REQUIREMENTS, [EventType.RoomMember, MSC3575_STATE_KEY_LAZY]],
   },
-};
+} as const;
 
 const UNENCRYPTED_SUB_KEY = 'unencrypted_lazy_load';
 
@@ -126,31 +148,25 @@ export const synchronizeGlobalEmotes = async (client: MatrixClient) => {
   if (rooms.length > 0 && syncInstance) {
     const activeSubs = syncInstance.getRoomSubscriptions();
     rooms.forEach((id) => activeSubs.add(id));
+    // This call is "void" typed in some versions, but does async work internally.
     syncInstance.modifyRoomSubscriptions(activeSubs);
     logger.debug(`[SlidingSync] Subscribed to ${rooms.length} global emote rooms.`);
   }
 };
 
 export class SlidingSyncController {
-  private op: Promise<void> = Promise.resolve();
-
-  private enqueue<T>(fn: () => T | Promise<T>): Promise<T> {
-    const next = this.op.then(() => fn());
-    // keep the chain alive regardless of success/failure
-    this.op = next.then(
-      () => undefined,
-      () => undefined
-    );
-    return Promise.resolve(next);
-  }
-
   public static isSupportedOnServer: boolean = false;
 
   private static instance: SlidingSyncController;
+
   public syncInstance?: SlidingSync;
+
   private matrixClient?: MatrixClient;
   private initializationResolve?: () => void;
   private initializationPromise: Promise<void>;
+
+  // serialize mutations that can race (setListRanges, setList, modifyRoomSubscriptions, etc.)
+  private op: Promise<void> = Promise.resolve();
 
   private constructor() {
     this.initializationPromise = new Promise((resolve) => {
@@ -165,6 +181,16 @@ export class SlidingSyncController {
     return SlidingSyncController.instance;
   }
 
+  private enqueue<T>(fn: () => T | Promise<T>): Promise<T> {
+    const next = this.op.then(() => fn());
+    // keep the chain alive regardless of success/failure
+    this.op = Promise.resolve(next).then(
+      () => undefined,
+      () => undefined
+    );
+    return Promise.resolve(next);
+  }
+
   /**
    * Initializes the SlidingSync instance and triggers background list population.
    */
@@ -173,14 +199,17 @@ export class SlidingSyncController {
 
     const configuredLists = new Map(Object.entries(INITIAL_LIST_CONFIGS));
 
+    // Use a SAFE default subscription.
+    // Previously you were using ENCRYPTED with wildcard state, which is very heavy.
     const sync = new SlidingSync(
       client.baseUrl,
       configuredLists,
-      SUBSCRIPTIONS.ENCRYPTED,
+      SUBSCRIPTIONS.DEFAULT,
       client,
       INITIAL_SYNC_TIMEOUT_MS
     );
 
+    // Keep custom subscriptions if you want per-room overrides.
     sync.addCustomSubscription(UNENCRYPTED_SUB_KEY, SUBSCRIPTIONS.UNENCRYPTED);
 
     this.syncInstance = sync;
@@ -217,24 +246,12 @@ export class SlidingSyncController {
           ranges: [[0, 50]],
           sort: ['by_notification_level', 'by_recency'],
           timeline_limit: 1,
+          // IMPORTANT: include BASE_STATE_REQUIREMENTS here too
           required_state: [
-            [EventType.RoomJoinRules, ''],
-            [EventType.RoomAvatar, ''],
-            [EventType.RoomTombstone, ''],
-            [EventType.RoomEncryption, ''],
-            [EventType.RoomCreate, ''],
-            [EventType.RoomMember, MSC3575_STATE_KEY_ME],
+            ...BASE_STATE_REQUIREMENTS,
+            [EventType.RoomMember, MSC3575_STATE_KEY_LAZY],
           ],
-          include_old_rooms: {
-            timeline_limit: 0,
-            required_state: [
-              [EventType.RoomCreate, ''],
-              [EventType.RoomTombstone, ''],
-              [EventType.SpaceChild, MSC3575_WILDCARD],
-              [EventType.SpaceParent, MSC3575_WILDCARD],
-              [EventType.RoomMember, MSC3575_STATE_KEY_ME],
-            ],
-          },
+          include_old_rooms: SUBSCRIPTION_BASE.include_old_rooms,
           ...payload,
         };
 
@@ -296,7 +313,7 @@ export class SlidingSyncController {
   }
 
   /**
-   * Checks if the homeserver advertises native MSC3575 simplified support.
+   * Checks if the homeserver advertises native Simplified Sliding Sync support.
    */
   public async verifyServerSupport(client: MatrixClient): Promise<boolean> {
     const isSupported = await client?.doesServerSupportUnstableFeature(
@@ -314,9 +331,6 @@ export class SlidingSyncController {
    * Incrementally expands list ranges to fetch all user rooms in the background.
    */
   private executeBackgroundSpidering(sync: SlidingSync, batchLimit: number, delayMs: number): void {
-    // const sync = this.syncInstance;
-    if (!sync) return;
-
     const boundsTracker = new Map<string, number>(
       Object.keys(INITIAL_LIST_CONFIGS).map((key) => [key, INITIAL_LIST_CONFIGS[key].ranges[0][1]])
     );
