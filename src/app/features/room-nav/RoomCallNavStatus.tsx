@@ -31,7 +31,8 @@ export function CallNavStatus() {
       direction="Column"
       style={{
         flexShrink: 0,
-        borderTop: `1px solid #e0e0e0`,
+        borderTop: `1px solid #2a2837`,
+        borderRadius: '6px',
         justifyContent: 'center',
       }}
     >
