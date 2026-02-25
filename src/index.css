@@ -20,9 +20,13 @@
 
   --font-emoji: 'Twemoji_DISABLED';
   --font-secondary: 'InterVariable', var(--font-emoji), sans-serif;
+
+  --pwa-canvas-bg: #ffffff;
 }
 
-.dark-theme,
+.dark-theme {
+  --pwa-canvas-bg: #1a1a1a;
+}
 .butter-theme {
   --tc-link: hsl(213deg 100% 80%);
 
@@ -36,18 +40,21 @@
   --mx-uc-8: hsl(94, 100%, 80%);
 
   --font-secondary: 'InterVariable', var(--font-emoji), sans-serif;
+
+  --pwa-canvas-bg: #1a1916;
 }
 
 html {
   height: 100%;
   overflow: hidden;
+  background: var(--pwa-canvas-bg);
 }
 
 body {
-  background: var(--app-bg);
   margin: 0;
   padding: 0;
   height: 100%;
+  background: var(--pwa-canvas-bg);
   font-family: var(--font-secondary);
   font-size: 16px;
   font-weight: 400;
@@ -60,6 +67,11 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  background: var(--pwa-canvas-bg);
+
+  /* optional: keeps content out of notch/home indicator */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 *,
