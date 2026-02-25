@@ -1,7 +1,7 @@
 import { lightTheme } from 'folds';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { onDarkFontWeight, onLightFontWeight } from '../../config.css';
-import { butterTheme, darkTheme, rosePineTheme, silverTheme } from '../../colors.css';
+import { butterTheme, catppuccinMochaTheme, darkTheme, rosePineTheme, silverTheme } from '../../colors.css';
 import { settingsAtom } from '../state/settings';
 import { useSetting } from '../state/hooks/settings';
 
@@ -42,9 +42,14 @@ export const RosePineTheme: Theme = {
   kind: ThemeKind.Dark,
   classNames: ['rose-pine-theme', rosePineTheme, onDarkFontWeight, 'prism-dark'],
 };
+export const CatppuccinMochaTheme: Theme = {
+  id: 'catppuccin-mocha-theme',
+  kind: ThemeKind.Dark,
+  classNames: ['catppuccin-mocha-theme', catppuccinMochaTheme, onDarkFontWeight, 'prism-dark'],
+};
 
 export const useThemes = (): Theme[] => {
-  const themes: Theme[] = useMemo(() => [LightTheme, SilverTheme, DarkTheme, ButterTheme, RosePineTheme], []);
+  const themes: Theme[] = useMemo(() => [LightTheme, SilverTheme, DarkTheme, ButterTheme, RosePineTheme, CatppuccinMochaTheme], []);
 
   return themes;
 };
@@ -57,6 +62,7 @@ export const useThemeNames = (): Record<string, string> =>
       [DarkTheme.id]: 'Dark',
       [ButterTheme.id]: 'Butter',
       [RosePineTheme.id]: 'Rosé Pine',
+      [CatppuccinMochaTheme.id]: 'Catppuccin Mocha',
     }),
     []
   );
