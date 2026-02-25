@@ -165,6 +165,9 @@ export class SlidingSyncController {
   private initializationResolve?: () => void;
   private initializationPromise: Promise<void>;
 
+  private slidingSyncEnabled = false;
+  private slidingSyncDisabled = false;
+
   // serialize mutations that can race (setListRanges, setList, modifyRoomSubscriptions, etc.)
   private op: Promise<void> = Promise.resolve();
 
@@ -196,6 +199,7 @@ export class SlidingSyncController {
    */
   public async initialize(client: MatrixClient): Promise<SlidingSync> {
     this.matrixClient = client;
+    this.slidingSyncEnabled = true;
 
     const configuredLists = new Map(Object.entries(INITIAL_LIST_CONFIGS));
 
@@ -268,7 +272,17 @@ export class SlidingSyncController {
    * Forces immediate state population when a user explicitly navigates to a room.
    */
   public async focusRoom(roomId: string): Promise<void> {
+    // If sliding sync is known disabled, fast no-op.
+    if (this.slidingSyncDisabled) return;
+
+    // If sliding sync isn’t enabled yet and we don’t have a syncInstance,
+    // don’t block forever waiting for something that may never start.
+    if (!this.slidingSyncEnabled && !this.syncInstance) return;
+
+    // Otherwise wait for init to complete (or disable() to resolve it)
     await this.initializationPromise;
+
+    if (!this.syncInstance) return;
 
     const sync = this.syncInstance;
     const client = this.matrixClient;
@@ -320,7 +334,19 @@ export class SlidingSyncController {
     if (isSupported) {
       logger.debug('[SlidingSync] Native org.matrix.simplified_msc3575 support detected.');
     }
+
+    if (!isSupported) {
+      this.disable();
+    }
+
     return SlidingSyncController.isSupportedOnServer;
+  }
+
+  public disable(): void {
+    if (this.slidingSyncEnabled || this.slidingSyncDisabled) return;
+
+    this.slidingSyncDisabled = true;
+    this.initializationResolve?.(); // unblock focusRoom callers
   }
 
   /**

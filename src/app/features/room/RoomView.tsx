@@ -88,9 +88,24 @@ export function RoomView({ room, eventId }: { room: Room; eventId?: string }) {
   const accessibleTagColors = useAccessibleTagColors(theme.kind, powerLevelTags);
 
   useEffect(() => {
-    if (SlidingSyncController.isSupportedOnServer) {
-      void SlidingSyncController.getInstance().focusRoom(room.roomId);
-    }
+    let cancelled = false;
+
+    const run = async () => {
+      const controller = SlidingSyncController.getInstance();
+      try {
+        await controller.focusRoom(room.roomId);
+      } catch (err) {
+        if (!cancelled) {
+          console.error('focusRoom failed', err);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [room.roomId]);
 
   useKeyDown(

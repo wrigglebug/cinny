@@ -56,6 +56,9 @@ export const startClient = async (mx: MatrixClient) => {
     return;
   }
 
+  // tell the controller we are NOT using sliding sync
+  syncController.disable();
+
   await mx.startClient({
     initialSyncLimit: 20,
     lazyLoadMembers: true,
