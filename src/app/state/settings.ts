@@ -20,6 +20,8 @@ export interface Settings {
   twitterEmoji: boolean;
   pageZoom: number;
   hideActivity: boolean;
+  hideFollowingIndicatorRooms: boolean;
+  hideFollowingIndicatorDMs: boolean;
 
   isPeopleDrawer: boolean;
   memberSortFilterIndex: number;
@@ -56,6 +58,8 @@ const defaultSettings: Settings = {
   twitterEmoji: false,
   pageZoom: 100,
   hideActivity: false,
+  hideFollowingIndicatorRooms: false,
+  hideFollowingIndicatorDMs: false,
 
   isPeopleDrawer: true,
   memberSortFilterIndex: 0,

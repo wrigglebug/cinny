@@ -892,6 +892,14 @@ function Messages() {
     settingsAtom,
     'hideNickAvatarEvents'
   );
+  const [hideFollowingIndicatorRooms, setHideFollowingIndicatorRooms] = useSetting(
+    settingsAtom,
+    'hideFollowingIndicatorRooms'
+  );
+  const [hideFollowingIndicatorDMs, setHideFollowingIndicatorDMs] = useSetting(
+    settingsAtom,
+    'hideFollowingIndicatorDMs'
+  );
   const [mediaAutoLoad, setMediaAutoLoad] = useSetting(settingsAtom, 'mediaAutoLoad');
   const [urlPreview, setUrlPreview] = useSetting(settingsAtom, 'urlPreview');
   const [encUrlPreview, setEncUrlPreview] = useSetting(settingsAtom, 'encUrlPreview');
@@ -938,6 +946,32 @@ function Messages() {
               variant="Primary"
               value={hideNickAvatarEvents}
               onChange={setHideNickAvatarEvents}
+            />
+          }
+        />
+      </SequenceCard>
+      <SequenceCard className={SequenceCardStyle} variant="SurfaceVariant" direction="Column">
+        <SettingTile
+          title="Hide Following Indicator (Rooms)"
+          description='Hide the "X is following the conversation" messages in rooms.'
+          after={
+            <Switch
+              variant="Primary"
+              value={hideFollowingIndicatorRooms}
+              onChange={setHideFollowingIndicatorRooms}
+            />
+          }
+        />
+      </SequenceCard>
+      <SequenceCard className={SequenceCardStyle} variant="SurfaceVariant" direction="Column">
+        <SettingTile
+          title="Hide Following Indicator (DMs)"
+          description='Hide the "X is following the conversation" messages in direct messages.'
+          after={
+            <Switch
+              variant="Primary"
+              value={hideFollowingIndicatorDMs}
+              onChange={setHideFollowingIndicatorDMs}
             />
           }
         />

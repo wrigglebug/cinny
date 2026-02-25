@@ -7,6 +7,7 @@ import { useStateEvent } from '../../hooks/useStateEvent';
 import { StateEvent } from '../../../types/matrix/room';
 import { usePowerLevelsAPI, usePowerLevelsContext } from '../../hooks/usePowerLevels';
 import { useMatrixClient } from '../../hooks/useMatrixClient';
+import { useIsDirectRoom } from '../../hooks/useRoom';
 import { useEditor } from '../../components/editor';
 import { RoomInputPlaceholder } from './RoomInputPlaceholder';
 import { RoomTimeline } from './RoomTimeline';
@@ -69,6 +70,9 @@ export function RoomView({ room, eventId }: { room: Room; eventId?: string }) {
   const roomInputRef = useRef<HTMLDivElement>(null);
   const roomViewRef = useRef<HTMLDivElement>(null);
   const [hideActivity] = useSetting(settingsAtom, 'hideActivity');
+  const [hideFollowingIndicatorRooms] = useSetting(settingsAtom, 'hideFollowingIndicatorRooms');
+  const [hideFollowingIndicatorDMs] = useSetting(settingsAtom, 'hideFollowingIndicatorDMs');
+  const isDirect = useIsDirectRoom();
   const { roomId } = room;
   const editor = useEditor();
   const mx = useMatrixClient();
@@ -158,7 +162,11 @@ export function RoomView({ room, eventId }: { room: Room; eventId?: string }) {
             </>
           )}
         </div>
-        {hideActivity ? <RoomViewFollowingPlaceholder /> : <RoomViewFollowing room={room} />}
+        {(isDirect ? hideFollowingIndicatorDMs : hideFollowingIndicatorRooms) ? (
+          <RoomViewFollowingPlaceholder />
+        ) : (
+          <RoomViewFollowing room={room} />
+        )}
       </Box>
     </Page>
   );
