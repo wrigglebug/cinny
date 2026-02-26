@@ -195,15 +195,14 @@ const timelineSortedCache = new WeakMap<
 const getTimelineEventsOrdered = (t: EventTimeline): MatrixEvent[] => {
   const evs = t.getEvents();
   const last = evs[evs.length - 1];
-
-  const lastKey = `${last?.getId() ?? ''}:${last?.getTs() ?? 0}:${last?.getSender() ?? ''}`;
+  const lastKey = `${last?.getId() ?? ''}:${evs.length}`;
 
   const cached = timelineSortedCache.get(t);
   if (cached && cached.len === evs.length && cached.lastKey === lastKey) {
     return cached.events;
   }
 
-  const ordered = [...evs].sort(compareTimelineEvents);
+  const ordered = [...evs]; // keep SDK order
   timelineSortedCache.set(t, { len: evs.length, lastKey, events: ordered });
   return ordered;
 };
