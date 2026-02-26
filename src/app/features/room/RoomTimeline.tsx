@@ -548,6 +548,7 @@ export function RoomTimeline({
     [getPowerLevel, getPowerLevelTag]
   );
 
+  const creators = useRoomCreators(room);
   const myPowerLevel = getPowerLevel(mx.getUserId() ?? '');
   const creatorsTag = useRoomCreatorsTag();
   const powerLevelTags = usePowerLevelTags(room, powerLevels);
@@ -1153,6 +1154,7 @@ export function RoomTimeline({
           editedEvent?.getContent()['m.new_content'] ?? mEvent.getContent()) as GetContentCallback;
 
         const senderId = mEvent.getSender() ?? '';
+        const senderPowerLevel = getPowerLevel(mEvent.getSender());
         const senderDisplayName =
           getMemberDisplayName(room, senderId) ?? getMxIdLocalPart(senderId) ?? senderId;
 
@@ -1237,6 +1239,7 @@ export function RoomTimeline({
         const hasReactions = reactions && reactions.length > 0;
         const { replyEventId, threadRootId } = mEvent;
         const highlighted = focusItem?.index === item && focusItem.highlight;
+        const senderPowerLevel = getPowerLevel(mEvent.getSender());
 
         return (
           <Message
@@ -1318,6 +1321,7 @@ export function RoomTimeline({
                     mEvent.getContent()) as GetContentCallback;
 
                   const senderId = mEvent.getSender() ?? '';
+                  const senderPowerLevel = getPowerLevel(mEvent.getSender());
                   const senderDisplayName =
                     getMemberDisplayName(room, senderId) ?? getMxIdLocalPart(senderId) ?? senderId;
                   return (
@@ -1689,10 +1693,6 @@ export function RoomTimeline({
     }
   );
 
-  let prevEvent: MatrixEvent | undefined;
-  let isPrevRendered = false;
-  let newDivider = false;
-  let dayDivider = false;
   const eventRenderer = (item: number) => {
     const [eventTimeline, baseIndex] = getTimelineAndBaseIndex(timeline.linkedTimelines, item);
     if (!eventTimeline) return null;
@@ -1743,8 +1743,6 @@ export function RoomTimeline({
           timelineSet,
           collapsed
         );
-    prevEvent = mEvent;
-    isPrevRendered = !!eventJSX;
 
     const newDividerJSX =
       newDivider && eventJSX && eventSender !== mx.getUserId() ? (
@@ -1775,9 +1773,6 @@ export function RoomTimeline({
       ) : null;
 
     if (eventJSX && (newDividerJSX || dayDividerJSX)) {
-      if (newDividerJSX) newDivider = false;
-      if (dayDividerJSX) dayDivider = false;
-
       return (
         <React.Fragment key={mEventId}>
           {newDividerJSX}
