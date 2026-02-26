@@ -400,8 +400,10 @@ export const useVirtualPaginator = <TScrollElement extends HTMLElement>(
     const prev = prevCountRef.current;
     if (prev === count) return;
 
-    const el = getScrollElement();
-    stickToEndRef.current = !!el && el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const scrollEl = getScrollElement();
+    // only auto-stick if user is basically at the bottom
+    stickToEndRef.current =
+      !!scrollEl && scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 80;
 
     if (count > prev) {
       const wasAtEnd = range.end >= prev; // tolerant (bursts / off-by-one)
@@ -419,11 +421,10 @@ export const useVirtualPaginator = <TScrollElement extends HTMLElement>(
 
   useLayoutEffect(() => {
     if (!stickToEndRef.current) return;
+    const scrollEl = getScrollElement();
+    if (!scrollEl) return;
 
-    const el = getScrollElement();
-    if (!el) return;
-
-    el.scrollTo({ top: el.scrollHeight, behavior: 'instant' as any });
+    scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: 'instant' });
     stickToEndRef.current = false;
   }, [range, getScrollElement]);
 
