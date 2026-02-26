@@ -17,32 +17,37 @@ export function useAppVisibility(mx: MatrixClient | undefined) {
   useEffect(() => {
     const handleVisibilityChange = () => {
       const isVisible = document.visibilityState === 'visible';
+      appEvents.visibilityChange.emit(isVisible);
+      if (isVisible) appEvents.appForeground.emit();
+      else appEvents.visibilityHidden.emit();
+    };
 
-      appEvents.onVisibilityChange?.(isVisible);
-
-      if (isVisible) {
-        appEvents.onAppForeground?.();
-      } else {
-        appEvents.onVisibilityHidden?.();
+    const handlePageShow = (e: PageTransitionEvent) => {
+      // iOS BFCache restore often lands here without a clean visibilitychange
+      if (e.persisted || document.visibilityState === 'visible') {
+        appEvents.visibilityChange.emit(true);
+        appEvents.appForeground.emit();
       }
     };
 
     const handleFocus = () => {
-      appEvents.onAppFocus?.();
-      appEvents.onAppForeground?.();
+      appEvents.appFocus.emit();
+      appEvents.appForeground.emit();
     };
 
     const handleOnline = () => {
-      appEvents.onNetworkOnline?.();
-      appEvents.onAppForeground?.();
+      appEvents.networkOnline.emit();
+      appEvents.appForeground.emit();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pageshow', handlePageShow);
     window.addEventListener('focus', handleFocus);
     window.addEventListener('online', handleOnline);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pageshow', handlePageShow);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleOnline);
     };
@@ -55,30 +60,26 @@ export function useAppVisibility(mx: MatrixClient | undefined) {
       togglePusher(mx, clientConfig, isVisible, usePushNotifications, pushSubAtom);
     };
 
-    appEvents.onVisibilityChange = handleVisibilityForNotifications;
-    return () => {
-      appEvents.onVisibilityChange = null;
-    };
+    return appEvents.visibilityChange.add(handleVisibilityForNotifications);
   }, [mx, clientConfig, usePushNotifications, pushSubAtom]);
 
   useEffect(() => {
     if (!mx) return;
 
     const controller = SlidingSyncController.getInstance();
-
     const resume = () => {
       if (!SlidingSyncController.isSupportedOnServer) return;
       void controller.resumeFromAppForeground();
     };
 
-    appEvents.onAppForeground = resume;
-    appEvents.onAppFocus = resume;
-    appEvents.onNetworkOnline = resume;
+    const unsub1 = appEvents.appForeground.add(resume);
+    const unsub2 = appEvents.appFocus.add(resume);
+    const unsub3 = appEvents.networkOnline.add(resume);
 
     return () => {
-      appEvents.onAppForeground = null;
-      appEvents.onAppFocus = null;
-      appEvents.onNetworkOnline = null;
+      unsub1();
+      unsub2();
+      unsub3();
     };
   }, [mx]);
 }

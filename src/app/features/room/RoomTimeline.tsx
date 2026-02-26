@@ -201,15 +201,23 @@ const timelineSortedCache = new WeakMap<
 
 const getTimelineEventsOrdered = (t: EventTimeline): MatrixEvent[] => {
   const evs = t.getEvents();
+  const first = evs[0];
   const last = evs[evs.length - 1];
-  const lastKey = `${last?.getId() ?? ''}:${evs.length}`;
+
+  const lastKey = [
+    evs.length,
+    first?.getId() ?? '',
+    first?.getTs() ?? 0,
+    last?.getId() ?? '',
+    last?.getTs() ?? 0,
+  ].join('|');
 
   const cached = timelineSortedCache.get(t);
   if (cached && cached.len === evs.length && cached.lastKey === lastKey) {
     return cached.events;
   }
 
-  const ordered = [...evs]; // keep SDK order
+  const ordered = [...evs].sort(compareTimelineEvents);
   timelineSortedCache.set(t, { len: evs.length, lastKey, events: ordered });
   return ordered;
 };
@@ -660,6 +668,53 @@ export function RoomTimeline({
 
   const getScrollElement = useCallback(() => scrollRef.current, []);
 
+  // iOS PWA: when restoring from background / push-open / BFCache,
+  // force a re-stitch of linked timelines + range to avoid blank timelines.
+  useEffect(() => {
+    const onResume = () => {
+      if (document.visibilityState && document.visibilityState !== 'visible') return;
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeline((ct) => {
+            const linkedTimelines = getLinkedTimelines(getLiveTimeline(room));
+            const evLength = getTimelinesEventsCount(linkedTimelines);
+
+            if (atBottomRef.current) {
+              return {
+                linkedTimelines,
+                range: { start: Math.max(evLength - PAGINATION_LIMIT, 0), end: evLength },
+              };
+            }
+
+            return {
+              linkedTimelines,
+              range: {
+                start: Math.min(ct.range.start, evLength),
+                end: Math.min(ct.range.end, evLength),
+              },
+            };
+          });
+
+          if (atBottomRef.current) {
+            scrollToBottomRef.current.count += 1;
+            scrollToBottomRef.current.smooth = false;
+          }
+        });
+      });
+    };
+
+    window.addEventListener('pageshow', onResume);
+    window.addEventListener('focus', onResume);
+    document.addEventListener('visibilitychange', onResume);
+
+    return () => {
+      window.removeEventListener('pageshow', onResume);
+      window.removeEventListener('focus', onResume);
+      document.removeEventListener('visibilitychange', onResume);
+    };
+  }, [room]);
+
   const { getItems, scrollToItem, scrollToElement, observeBackAnchor, observeFrontAnchor } =
     useVirtualPaginator({
       count: eventsLength,
@@ -942,7 +997,7 @@ export function RoomTimeline({
       const evtTimeline = getEventTimeline(room, readUptoEventId);
       const absoluteIndex =
         evtTimeline && getEventIdAbsoluteIndex(linkedTimelines, evtTimeline, readUptoEventId);
-      if (absoluteIndex) {
+      if (typeof absoluteIndex === 'number') {
         scrollToItem(absoluteIndex, {
           behavior: 'instant',
           align: 'start',

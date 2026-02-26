@@ -180,9 +180,8 @@ export function ClientRoot({ children }: ClientRootProps) {
     if (!mx) return;
     if (!mx.clientRunning) return;
     if (!SlidingSyncController.isSupportedOnServer) return;
-
     void SlidingSyncController.getInstance().resumeFromAppForeground();
-  }, [mx, mx?.clientRunning]);
+  }, [mx]);
 
   useSyncState(
     mx,
