@@ -172,33 +172,39 @@ export const useVirtualPaginator = <TScrollElement extends HTMLElement>(
     const prev = prevCountRef.current;
     if (prev === count) return;
 
+    const grew = count > prev;
+    if (!grew) {
+      prevCountRef.current = count;
+      stickToEndRef.current = false;
+      return;
+    }
+
+    const wasAtEnd = range.end >= prev; // tolerant for bursts
+    if (!wasAtEnd) {
+      prevCountRef.current = count;
+      stickToEndRef.current = false;
+      return;
+    }
+
     const scrollEl = getScrollElement();
-    // only auto-stick if user is basically at bottom
-    stickToEndRef.current =
+    const nearBottom =
       !!scrollEl && scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 80;
 
-    if (count > prev) {
-      const wasAtEnd = range.end >= prev; // tolerant end check (bursts/off-by-one)
-      if (wasAtEnd) {
-        const end = count;
-        const start = Math.max(end - limit, 0);
-        if (range.start !== start || range.end !== end) {
-          onRangeChange({ start, end });
-        }
-      }
+    // Only pin if user was actually near bottom
+    stickToEndRef.current = nearBottom;
+
+    const end = count;
+    const start = Math.max(end - limit, 0);
+
+    if (range.start !== start || range.end !== end) {
+      stickToEndRef.current = nearBottom;
+      onRangeChange({ start, end });
+    } else {
+      stickToEndRef.current = false;
     }
 
     prevCountRef.current = count;
   }, [count, range.start, range.end, limit, onRangeChange, getScrollElement]);
-
-  useLayoutEffect(() => {
-    if (!stickToEndRef.current) return;
-    const scrollEl = getScrollElement();
-    if (!scrollEl) return;
-
-    scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: 'instant' });
-    stickToEndRef.current = false;
-  }, [range, getScrollElement]);
 
   const restoreScrollRef = useRef<{
     scrollTop: number;
@@ -407,6 +413,7 @@ export const useVirtualPaginator = <TScrollElement extends HTMLElement>(
 
   useLayoutEffect(() => {
     if (!stickToEndRef.current) return;
+    if (scrollToItemRef.current) return;
 
     const scrollEl = getScrollElement();
     if (!scrollEl) return;
