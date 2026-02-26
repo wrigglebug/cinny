@@ -165,6 +165,8 @@ export const useVirtualPaginator = <TScrollElement extends HTMLElement>(
   const { count, limit, range, onRangeChange, getScrollElement, getItemElement, onEnd } = options;
 
   const initialRenderRef = useRef(true);
+  const prevCountRef = useRef(count);
+  const stickToEndRef = useRef(false);
 
   const restoreScrollRef = useRef<{
     scrollTop: number;
@@ -371,6 +373,17 @@ export const useVirtualPaginator = <TScrollElement extends HTMLElement>(
     restoreScrollRef.current = undefined;
   }, [range, getScrollElement, getItemElement]);
 
+  useLayoutEffect(() => {
+    if (!stickToEndRef.current) return;
+
+    const scrollEl = getScrollElement();
+    if (!scrollEl) return;
+
+    // Keep pinned to bottom after burst/range expansion
+    scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: 'instant' });
+    stickToEndRef.current = false;
+  }, [range, getScrollElement]);
+
   // When scrollToItem index was not in range.
   // Scroll to item after range changes.
   useLayoutEffect(() => {
@@ -382,6 +395,30 @@ export const useVirtualPaginator = <TScrollElement extends HTMLElement>(
     });
     scrollToItemRef.current = undefined;
   }, [range, scrollToItem]);
+
+  useEffect(() => {
+    const prev = prevCountRef.current;
+    if (prev === count) return;
+
+    const scrollEl = getScrollElement();
+    // "near bottom" check to preserve UX (only auto-stick when user is basically at bottom)
+    stickToEndRef.current =
+      !!scrollEl && scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 80;
+
+    if (count > prev) {
+      const wasAtEnd = range.end >= prev; // tolerant: handles bursts/off-by-one
+      if (wasAtEnd) {
+        const end = count;
+        const start = Math.max(end - limit, 0);
+
+        if (range.start !== start || range.end !== end) {
+          onRangeChange({ start, end });
+        }
+      }
+    }
+
+    prevCountRef.current = count;
+  }, [count, range.start, range.end, limit, onRangeChange, getScrollElement]);
 
   // Continue pagination to fill view height with scroll items
   // check if pagination anchor are in visible view height
