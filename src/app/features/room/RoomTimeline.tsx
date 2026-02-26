@@ -642,12 +642,16 @@ export function RoomTimeline({
       range: timeline.range,
       onRangeChange: useCallback((r) => setTimeline((cs) => ({ ...cs, range: r })), []),
       getScrollElement,
-      getItemElement: useCallback(
-        (index: number) =>
-          (scrollRef.current?.querySelector(`[data-message-item="${index}"]`) as HTMLElement) ??
-          undefined,
-        []
-      ),
+      getItemElement: useCallback((index: number) => {
+        const root = scrollRef.current;
+        if (!root) return undefined;
+
+        for (let i = index; i >= Math.max(0, index - 50); i -= 1) {
+          const el = root.querySelector(`[data-message-item="${index}"]`) as HTMLElement | null;
+          if (el) return el;
+        }
+        return undefined;
+      }, []),
       onEnd: handleTimelinePagination,
     });
 
