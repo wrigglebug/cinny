@@ -168,6 +168,38 @@ export const useVirtualPaginator = <TScrollElement extends HTMLElement>(
   const prevCountRef = useRef(count);
   const stickToEndRef = useRef(false);
 
+  useEffect(() => {
+    const prev = prevCountRef.current;
+    if (prev === count) return;
+
+    const scrollEl = getScrollElement();
+    // only auto-stick if user is basically at bottom
+    stickToEndRef.current =
+      !!scrollEl && scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 80;
+
+    if (count > prev) {
+      const wasAtEnd = range.end >= prev; // tolerant end check (bursts/off-by-one)
+      if (wasAtEnd) {
+        const end = count;
+        const start = Math.max(end - limit, 0);
+        if (range.start !== start || range.end !== end) {
+          onRangeChange({ start, end });
+        }
+      }
+    }
+
+    prevCountRef.current = count;
+  }, [count, range.start, range.end, limit, onRangeChange, getScrollElement]);
+
+  useLayoutEffect(() => {
+    if (!stickToEndRef.current) return;
+    const scrollEl = getScrollElement();
+    if (!scrollEl) return;
+
+    scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: 'instant' });
+    stickToEndRef.current = false;
+  }, [range, getScrollElement]);
+
   const restoreScrollRef = useRef<{
     scrollTop: number;
     anchorOffsetTop: number;
@@ -395,38 +427,6 @@ export const useVirtualPaginator = <TScrollElement extends HTMLElement>(
     });
     scrollToItemRef.current = undefined;
   }, [range, scrollToItem]);
-
-  useEffect(() => {
-    const prev = prevCountRef.current;
-    if (prev === count) return;
-
-    const scrollEl = getScrollElement();
-    // only auto-stick if user is basically at the bottom
-    stickToEndRef.current =
-      !!scrollEl && scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 80;
-
-    if (count > prev) {
-      const wasAtEnd = range.end >= prev; // tolerant (bursts / off-by-one)
-      if (wasAtEnd) {
-        const end = count;
-        const start = Math.max(end - limit, 0);
-        if (range.start !== start || range.end !== end) {
-          onRangeChange({ start, end });
-        }
-      }
-    }
-
-    prevCountRef.current = count;
-  }, [count, range.start, range.end, limit, onRangeChange, getScrollElement]);
-
-  useLayoutEffect(() => {
-    if (!stickToEndRef.current) return;
-    const scrollEl = getScrollElement();
-    if (!scrollEl) return;
-
-    scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: 'instant' });
-    stickToEndRef.current = false;
-  }, [range, getScrollElement]);
 
   // Continue pagination to fill view height with scroll items
   // check if pagination anchor are in visible view height
