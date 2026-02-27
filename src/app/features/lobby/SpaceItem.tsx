@@ -35,6 +35,7 @@ import { mxcUrlToHttp } from '../../utils/matrix';
 import { useMediaAuthentication } from '../../hooks/useMediaAuthentication';
 import { useOpenCreateRoomModal } from '../../state/hooks/createRoomModal';
 import { useOpenCreateSpaceModal } from '../../state/hooks/createSpaceModal';
+import { useOpenCreateCallRoomModal } from '../../state/hooks/createCallRoomModal';
 import { AddExistingModal } from '../add-existing';
 
 function SpaceProfileLoading() {
@@ -243,6 +244,7 @@ function RootSpaceProfile({ closed, categoryId, handleClose }: RootSpaceProfileP
 function AddRoomButton({ item }: { item: HierarchyItem }) {
   const [cords, setCords] = useState<RectCords>();
   const openCreateRoomModal = useOpenCreateRoomModal();
+  const openCreateCallRoomModal = useOpenCreateCallRoomModal();
   const [addExisting, setAddExisting] = useState(false);
 
   const handleAddRoom: MouseEventHandler<HTMLButtonElement> = (evt) => {
@@ -251,6 +253,11 @@ function AddRoomButton({ item }: { item: HierarchyItem }) {
 
   const handleCreateRoom = () => {
     openCreateRoomModal(item.roomId);
+    setCords(undefined);
+  };
+
+  const handleCreateCallRoom = () => {
+    openCreateCallRoomModal(item.roomId);
     setCords(undefined);
   };
 
@@ -284,6 +291,14 @@ function AddRoomButton({ item }: { item: HierarchyItem }) {
               onClick={handleCreateRoom}
             >
               <Text size="T300">New Room</Text>
+            </MenuItem>
+            <MenuItem
+              size="300"
+              radii="300"
+              fill="None"
+              onClick={handleCreateCallRoom}
+            >
+              <Text size="T300">New Call Room</Text>
             </MenuItem>
             <MenuItem size="300" radii="300" fill="None" onClick={handleAddExisting}>
               <Text size="T300">Existing Room</Text>

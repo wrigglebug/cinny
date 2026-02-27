@@ -69,6 +69,7 @@ import { CreateRoomModalRenderer } from '../features/create-room';
 import { HomeCreateRoom } from './client/home/CreateRoom';
 import { Create } from './client/create';
 import { CreateSpaceModalRenderer } from '../features/create-space';
+import { CreateCallRoomModalRenderer } from '../features/create-call-room';
 import { SearchModalRenderer } from '../features/search';
 import { CallProvider } from './client/call/CallProvider';
 import { PersistentCallContainer } from './client/call/PersistentCallContainer';
@@ -146,6 +147,7 @@ export const createRouter = (clientConfig: ClientConfig, screenSize: ScreenSize)
                       <InviteUserPromptRenderer />
                       <CreateRoomModalRenderer />
                       <CreateSpaceModalRenderer />
+                      <CreateCallRoomModalRenderer />
                       <RoomSettingsRenderer />
                       <SpaceSettingsRenderer />
                       <ReceiveSelfDeviceVerification />
