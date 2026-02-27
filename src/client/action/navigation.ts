@@ -1,4 +1,3 @@
-import { getDefaultStore } from 'jotai';
 import type { Position, RectCords } from 'folds';
 
 import { createRoomModalAtom } from '../../app/state/createRoomModal';
@@ -6,8 +5,7 @@ import { createSpaceModalAtom } from '../../app/state/createSpaceModal';
 import { inviteUserPromptAtom } from '../../app/state/inviteUserPrompt';
 import { joinAddressPromptAtom } from '../../app/state/joinAddressPrompt';
 import { userRoomProfileAtom } from '../../app/state/userRoomProfile';
-
-const store = getDefaultStore();
+import { appStore as store } from '../../app/state/store';
 
 export function openCreateRoom(isSpace = false, parentId: string | null = null) {
   if (isSpace) {
