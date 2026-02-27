@@ -78,6 +78,24 @@ const createSpacePowerLevelsOverride = () => ({
   events_default: 50,
 });
 
+const createCallPowerLevelsOverride = () => ({
+  events_default: 0,
+  state_default: 50,
+  events: {
+    [StateEvent.GroupCallPrefix]: 0,
+    [StateEvent.GroupCallMemberPrefix]: 0,
+  },
+});
+
+export const createCallStateEvent = (): ICreateRoomStateEvent => ({
+  type: StateEvent.GroupCallPrefix,
+  state_key: '',
+  content: {
+    'm.intent': 'm.room',
+    'm.type': 'm.voice',
+  },
+});
+
 export const createRoomEncryptionState = () => ({
   type: 'm.room.encryption',
   state_key: '',
@@ -127,6 +145,11 @@ export const createRoom = async (mx: MatrixClient, data: CreateRoomData): Promis
 
   if (data.type === RoomType.Space) {
     options.power_level_content_override = createSpacePowerLevelsOverride();
+  }
+
+  if (data.type === RoomType.Call) {
+    options.power_level_content_override = createCallPowerLevelsOverride();
+    initialState.push(createCallStateEvent());
   }
 
   const result = await mx.createRoom(options);
