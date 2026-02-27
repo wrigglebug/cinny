@@ -95,6 +95,7 @@ function InviteNotifications() {
   const mx = useMatrixClient();
 
   const navigate = useNavigate();
+  const invitesUrl = usePathWithOrigin(getInboxInvitesPath());
   const [showNotifications] = useSetting(settingsAtom, 'useInAppNotifications');
   const [notificationSound] = useSetting(settingsAtom, 'isNotificationSounds');
 
@@ -118,19 +119,44 @@ function InviteNotifications() {
         .sort((a, b) => b.ts - a.ts)[0];
       const senderName = latestInvite?.senderName ?? 'Invitation';
       const roomName = latestInvite?.roomName ?? 'Unknown';
-      const noti = new window.Notification(`${senderName} — ${roomName}`, {
+      
+      if (!('Notification' in window)) {
+        return;
+      }
+
+      const title = `${senderName} — ${roomName}`;
+      const options: NotificationOptions = {
         icon: LogoSVG,
         badge: LogoSVG,
         body: `You have ${count} new invitation${count > 1 ? 's' : ''}.`,
         silent: true,
-      });
-
-      noti.onclick = () => {
-        if (!window.closed) navigate(getInboxInvitesPath());
-        noti.close();
+        tag: 'cinny-invite',
+        data: { url: invitesUrl },
       };
+      
+      // Use ServiceWorkerRegistration.showNotification if service worker is active
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, options);
+        }).catch(() => {
+          // Fallback to direct notification if service worker fails
+          if (typeof window.Notification === 'function') {
+            const noti = new window.Notification(title, options);
+            noti.onclick = () => {
+              if (!window.closed) navigate(getInboxInvitesPath());
+              noti.close();
+            };
+          }
+        });
+      } else if (typeof window.Notification === 'function') {
+        const noti = new window.Notification(title, options);
+        noti.onclick = () => {
+          if (!window.closed) navigate(getInboxInvitesPath());
+          noti.close();
+        };
+      }
     },
-    [invites, mx, navigate]
+    [invites, mx, navigate, invitesUrl]
   );
 
   const playSound = useCallback(() => {
@@ -170,6 +196,7 @@ function MessageNotifications() {
   const navigate = useNavigate();
   const notificationSelected = useInboxNotificationsSelected();
   const selectedRoomId = useSelectedRoom();
+  const notificationsUrl = usePathWithOrigin(getInboxNotificationsPath());
 
   const notify = useCallback(
     ({
@@ -185,26 +212,50 @@ function MessageNotifications() {
       roomId: string;
       eventId: string;
     }) => {
-      const noti = new window.Notification(`${username} — ${roomName}`, {
+      if (!('Notification' in window)) {
+        return;
+      }
+
+      const title = `${username} — ${roomName}`;
+      const options: NotificationOptions = {
         icon: roomAvatar,
         badge: roomAvatar,
         body,
         silent: true,
-      });
-
-      noti.onclick = () => {
-        if (!window.closed) navigate(getInboxNotificationsPath());
-        noti.close();
-        notifRef.current = undefined;
+        tag: 'cinny-message',
+        data: { url: notificationsUrl },
       };
-
-      notifRef.current?.close();
-      notifRef.current = noti;
+      
+      // Use ServiceWorkerRegistration.showNotification if service worker is active
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, options);
+        }).catch(() => {
+          // Fallback to direct notification if service worker fails
+          if (typeof window.Notification === 'function') {
+            const noti = new window.Notification(title, options);
+            noti.onclick = () => {
+              if (!window.closed) navigate(getInboxNotificationsPath());
+              noti.close();
+              notifRef.current = undefined;
+            };
+            notifRef.current?.close();
+            notifRef.current = noti;
+          }
+        });
+      } else if (typeof window.Notification === 'function') {
+        const noti = new window.Notification(title, options);
+        noti.onclick = () => {
+          if (!window.closed) navigate(getInboxNotificationsPath());
+          noti.close();
+          notifRef.current = undefined;
+        };
+        notifRef.current?.close();
+          notifRef.current = noti;
+      }
     },
-    [navigate]
-  );
-
-  const playSound = useCallback(() => {
+    [navigate, notificationsUrl]
+  );  const playSound = useCallback(() => {
     const audioElement = audioRef.current;
     audioElement?.play();
   }, []);
