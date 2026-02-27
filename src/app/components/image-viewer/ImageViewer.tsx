@@ -6,6 +6,7 @@ import { Box, Chip, Header, Icon, IconButton, Icons, Text, as } from 'folds';
 import * as css from './ImageViewer.css';
 import { useZoom } from '../../hooks/useZoom';
 import { usePan } from '../../hooks/usePan';
+import { useTouchGestures } from '../../hooks/useTouchGestures';
 import { downloadMedia } from '../../utils/matrix';
 
 export type ImageViewerProps = {
@@ -18,6 +19,19 @@ export const ImageViewer = as<'div', ImageViewerProps>(
   ({ className, alt, src, requestClose, ...props }, ref) => {
     const { zoom, zoomIn, zoomOut, setZoom } = useZoom(0.2);
     const { pan, cursor, onMouseDown } = usePan(zoom !== 1);
+    const touchGestures = useTouchGestures(
+      true,
+      (scale) => setZoom(scale),
+      0.1,
+      5
+    );
+
+    const finalPan = {
+      translateX: pan.translateX + touchGestures.pan.translateX,
+      translateY: pan.translateY + touchGestures.pan.translateY,
+    };
+
+    const finalZoom = touchGestures.scale !== 1 ? touchGestures.scale : zoom;
 
     const handleDownload = async () => {
       const fileContent = await downloadMedia(src);
@@ -61,7 +75,7 @@ export const ImageViewer = as<'div', ImageViewerProps>(
               <Icon size="50" src={Icons.Minus} />
             </IconButton>
             <Chip variant="SurfaceVariant" radii="Pill" onClick={() => setZoom(zoom === 1 ? 2 : 1)}>
-              <Text size="B300">{Math.round(zoom * 100)}%</Text>
+              <Text size="B300">{Math.round(finalZoom * 100)}%</Text>
             </Chip>
             <IconButton
               variant={zoom > 1 ? 'Success' : 'SurfaceVariant'}
@@ -94,11 +108,14 @@ export const ImageViewer = as<'div', ImageViewerProps>(
             className={css.ImageViewerImg}
             style={{
               cursor,
-              transform: `scale(${zoom}) translate(${pan.translateX}px, ${pan.translateY}px)`,
+              transform: `scale(${finalZoom}) translate(${finalPan.translateX}px, ${finalPan.translateY}px)`,
             }}
             src={src}
             alt={alt}
             onMouseDown={onMouseDown}
+            onTouchStart={touchGestures.onTouchStart}
+            onTouchMove={touchGestures.onTouchMove}
+            onTouchEnd={touchGestures.onTouchEnd}
           />
         </Box>
       </Box>

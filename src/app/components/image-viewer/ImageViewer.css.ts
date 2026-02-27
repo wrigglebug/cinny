@@ -25,6 +25,7 @@ export const ImageViewerContent = style([
     backgroundColor: color.Background.Container,
     color: color.Background.OnContainer,
     overflow: 'hidden',
+    touchAction: 'none',
   },
 ]);
 
@@ -38,5 +39,7 @@ export const ImageViewerImg = style([
     maxHeight: '100%',
     backgroundColor: color.Surface.Container,
     transition: 'transform 100ms linear',
+    touchAction: 'none',
+    userSelect: 'none',
   },
 ]);
