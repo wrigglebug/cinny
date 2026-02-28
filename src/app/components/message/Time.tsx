@@ -41,9 +41,17 @@ export const Time = as<'span', TimeProps & ComponentProps<typeof Text>>(
     } else {
       time = `${timeDayMonYear(ts, resolvedDateFormatString)} ${formattedTime}`;
     }
-
+    const TimeTitle = `${timeDayMonYear(ts, resolvedDateFormatString)} ${formattedTime}`;
     return (
-      <Text as="time" style={{ flexShrink: 0 }} size="T200" priority="300" {...props} ref={ref}>
+      <Text
+        as="time"
+        style={{ flexShrink: 0 }}
+        size="T200"
+        priority="300"
+        title={TimeTitle}
+        {...props}
+        ref={ref}
+      >
         {time}
       </Text>
     );
