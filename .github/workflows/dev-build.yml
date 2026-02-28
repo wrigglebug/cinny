@@ -9,45 +9,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-and-tarball:
-    name: build and tarball
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6.0.2
-      - name: Setup node
-        uses: actions/setup-node@v6.2.0
-        with:
-          node-version: 24.13.1
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Build app
-        env:
-          NODE_OPTIONS: '--max_old_space_size=4096'
-        run: npm run build
-      - name: Get version from tag
-        id: vars
-        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
-      - name: Create tar.gz
-        run: tar -czvf cinny-${{ steps.vars.outputs.tag }}.tar.gz dist
-      # - name: Sign tar.gz
-      #   run: |
-      #     echo '${{ secrets.GNUPG_KEY }}' | gpg --batch --import
-      #     # Sadly a few lines in the private key match a few lines in the public key,
-      #     # As a result just --export --armor gives us a few lines replaced with ***
-      #     # making it useless for importing the signing key. Instead, we dump it as
-      #     # non-armored and hex-encode it so that its printable.
-      #     echo "PGP Signing key, in raw PGP format in hex. Import with cat ... | xxd -r -p - | gpg --import"
-      #     gpg --export | xxd -p
-      #     echo '${{ secrets.GNUPG_PASSPHRASE }}' | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --armor --detach-sign cinny-${{ steps.vars.outputs.tag }}.tar.gz
-      - name: Upload tagged release
-        uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836
-        with:
-          files: |
-            cinny-${{ steps.vars.outputs.tag }}.tar.gz
-            cinny-${{ steps.vars.outputs.tag }}.tar.gz.asc
-
   publish-image:
     name: Push Docker image to ghcr
     runs-on: ubuntu-latest
